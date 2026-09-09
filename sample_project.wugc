@@ -1,0 +1,12 @@
+{
+  "format": "wugc-project-1",
+  "title": "Wii U Movement Test",
+  "author": "Homebrew Developer",
+  "background": "#18365c",
+  "player_color": "#f4d35e",
+  "player_x": 560,
+  "player_y": 320,
+  "player_width": 80,
+  "player_height": 80,
+  "player_speed": 6
+}
