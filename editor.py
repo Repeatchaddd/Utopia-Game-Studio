@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
-"""Utopia Game Studio 0.2 - 2D/2.5D Wii U homebrew editor."""
+"""Utopia Game Studio 0.3 - 2D/2.5D Wii U homebrew editor."""
 import base64, json, shutil
 from pathlib import Path
 import tkinter as tk
 from tkinter import colorchooser, filedialog, messagebox, simpledialog, ttk
+from blueprint_editor import BlueprintPanel, default_graph
 
-APP_NAME, VERSION = "Utopia Game Studio", "0.2"
+APP_NAME, VERSION = "Utopia Game Studio", "0.3"
 ROOT = Path(__file__).resolve().parent
 TEMPLATE = ROOT / "runtime_template"
-DEFAULT = {"format":"utopia-project-2","title":"My Utopia Game","author":"Homebrew Developer",
+DEFAULT = {"format":"utopia-project-3","title":"My Utopia Game","author":"Homebrew Developer",
  "game_style":"2D / 2.5D","background":"#18365c","player_color":"#f4d35e",
  "player_x":560,"player_y":320,"player_width":80,"player_height":80,"player_speed":6,
- "animations":{},"active_animation":""}
+ "animations":{},"active_animation":"","blueprint":default_graph()}
 
 def fresh(): return json.loads(json.dumps(DEFAULT))
 def rgba(value): return "0x" + value.lstrip("#").upper() + "FFu"
@@ -28,9 +29,10 @@ class Editor(tk.Tk):
    ttk.Button(bar,text=label,command=fn).pack(side="left",padx=3)
   ttk.Label(bar,text="2D / 2.5D",foreground="#356fa6").pack(side="right",padx=8)
   tabs=ttk.Notebook(self); tabs.pack(fill="both",expand=True,padx=8,pady=(0,8))
-  scene=ttk.Frame(tabs,padding=8); anim=ttk.Frame(tabs,padding=8); tabs.add(scene,text="Scene"); tabs.add(anim,text="Animated Character")
-  self.build_scene(scene); self.build_anim(anim)
   self.status=tk.StringVar(value="Ready"); ttk.Label(self,textvariable=self.status,relief="sunken",anchor="w",padding=4).pack(fill="x")
+  scene=ttk.Frame(tabs,padding=8); anim=ttk.Frame(tabs,padding=8); logic=ttk.Frame(tabs)
+  tabs.add(scene,text="Scene"); tabs.add(anim,text="Animated Character"); tabs.add(logic,text="Blueprint Logic")
+  self.build_scene(scene); self.build_anim(anim); self.blueprint=BlueprintPanel(logic,lambda:self.project,self.status);self.blueprint.pack(fill="both",expand=True)
 
  def build_scene(self,parent):
   body=ttk.Panedwindow(parent,orient="horizontal"); body.pack(fill="both",expand=True)
@@ -74,7 +76,7 @@ class Editor(tk.Tk):
   return self.photos[key]
  def load_project(self):
   for k,v in self.vars.items():v.set(str(self.project[k]))
-  self.photos.clear(); self.refresh_animations(); self.redraw()
+  self.photos.clear(); self.refresh_animations(); self.blueprint.refresh(); self.redraw()
  def fields_changed(self):
   for k in ("title","author"):self.project[k]=self.vars[k].get()
   for k in ("player_x","player_y","player_width","player_height","player_speed"):
@@ -178,8 +180,8 @@ class Editor(tk.Tk):
   if not path:return
   try:
    data=json.loads(Path(path).read_text(encoding="utf-8"))
-   if data.get("format") not in ("utopia-project-2","wugc-project-1"):raise ValueError("Unsupported project format")
-   data["format"]="utopia-project-2";self.project={**fresh(),**data};self.project.setdefault("animations",{});self.project_path=Path(path);self.load_project();self.status.set(f"Opened {Path(path).name}")
+   if data.get("format") not in ("utopia-project-3","utopia-project-2","wugc-project-1"):raise ValueError("Unsupported project format")
+   data["format"]="utopia-project-3";self.project={**fresh(),**data};self.project.setdefault("animations",{});self.project.setdefault("blueprint",default_graph());self.project_path=Path(path);self.load_project();self.status.set(f"Opened {Path(path).name}")
   except Exception as e:messagebox.showerror(APP_NAME,f"Open failed:\n{e}")
  def save(self):
   if self.project_path is None:return self.save_as()
@@ -218,7 +220,7 @@ class Editor(tk.Tk):
     shutil.rmtree(out)
    shutil.copytree(TEMPLATE,out);p=self.project
    config=("#pragma once\n"+f"#define GAME_TITLE \"{p['title'].replace(chr(34),'')}\"\n#define START_X {p['player_x']}\n#define START_Y {p['player_y']}\n#define PLAYER_W {p['player_width']}\n#define PLAYER_H {p['player_height']}\n#define PLAYER_SPEED {p['player_speed']}\n#define BACKGROUND_COLOR {rgba(p['background'])}\n#define PLAYER_COLOR {rgba(p['player_color'])}\n")
-   (out/"source"/"game_config.h").write_text(config,encoding="utf-8");self.write_frames(out)
+   (out/"source"/"game_config.h").write_text(config,encoding="utf-8");self.write_frames(out);self.blueprint.write_header(out/"source"/"blueprint_logic.h")
    m=(out/"Makefile").read_text(encoding="utf-8").replace("APP_NAME := Utopia Game Studio Test",f"APP_NAME := {p['title']}").replace("APP_AUTHOR := Utopia",f"APP_AUTHOR := {p['author']}");(out/"Makefile").write_text(m,encoding="utf-8");(out/"project.ugs").write_text(json.dumps(p,indent=2)+"\n",encoding="utf-8")
    self.status.set(f"Exported to {out}");messagebox.showinfo(APP_NAME,f"Exported to:\n{out}\n\nBuild with: make")
   except Exception as e:messagebox.showerror(APP_NAME,f"Export failed:\n{e}")
