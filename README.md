@@ -1,10 +1,23 @@
-# Utopia Game Studio 0.3
+# Utopia Game Studio 0.4
 
-Utopia Game Studio is an independent visual creator for native Wii U homebrew games, focused on **2D and 2.5D games**.
+Utopia Game Studio is an independent visual creator for native Wii U homebrew games. Its first complete framework is focused on **2D and 2.5D RPGs**, with other genres planned later.
+
+## RPG player movement and directional animation
+
+Version 0.4 adds the first RPG-ready player controller:
+
+- D-pad movement on the TV and Wii U GamePad screens.
+- Separate idle and walking animations for down, left, right, and up.
+- The character keeps facing the last movement direction when stopped.
+- Diagonal movement is normalized so it is not faster than straight movement.
+- Missing idle/walk partners fall back to the available animation.
+- Older projects open and upgrade automatically.
+
+Create animations on the **Animated Character** tab, then assign them in the **RPG directional states** panel. PNG frames can be up to 128×128 pixels. Each animation may have its own frame size, speed, and looping setting.
 
 ## Blueprint-style visual logic
 
-Version 0.3 introduces Utopia's original node-based logic editor. It is inspired by the general idea of visual scripting, but does not use Unreal Engine code, assets, or branding.
+Version 0.3 introduced Utopia's original node-based logic editor. It is inspired by the general idea of visual scripting, but does not use Unreal Engine code, assets, or branding.
 
 - Draggable, color-coded nodes on a scrollable workspace.
 - Execution links drawn between nodes.
@@ -17,7 +30,7 @@ Version 0.3 introduces Utopia's original node-based logic editor. It is inspired
 - Connected D-pad-to-movement nodes are compiled into the native Wii U project.
 - Version 0.1 and 0.2 projects open and upgrade automatically.
 
-Version 0.2 animated-character tools remain included: named animations, multiple PNG frames, ordering, FPS, looping, preview playback, transparency, and native TV/GamePad animation.
+The animated-character tools include named animations, multiple PNG frames, ordering, FPS, looping, preview playback, transparency, directional state assignments, and native TV/GamePad animation.
 
 ## Using Blueprint Logic
 
@@ -45,8 +58,8 @@ Removing one of those links disables that direction in the exported game. Start,
 5. In the devkitPro MSYS2 terminal, enter the exported `utopia_wiiu_export` directory and run `make`.
 6. Copy `game.wuhb` to `wiiu/apps/utopia_test/game.wuhb` on the Aroma SD card.
 
-## Version 0.3 test
+## Version 0.4 test
 
-First export the untouched default blueprint and confirm all four directions. Then remove only the LEFT link, export again, and confirm that Left is disabled while the other directions still work.
+Create and assign at least the four walking directions, export, and confirm that movement selects the matching animation. Add the idle directions and confirm that releasing the D-pad changes to the idle animation while retaining the last facing direction. Test a diagonal and confirm its speed approximately matches straight movement. Finally, remove only the LEFT blueprint link, export again, and confirm that Left is disabled while the other directions still work.
 
 Utopia Game Studio is not affiliated with or endorsed by Nintendo, Epic Games, or YoYo Games.

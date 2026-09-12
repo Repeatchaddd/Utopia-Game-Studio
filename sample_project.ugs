@@ -1,8 +1,8 @@
 {
-  "format": "utopia-project-3",
-  "title": "Utopia Animation Test",
+  "format": "utopia-project-4",
+  "title": "My Utopia RPG",
   "author": "Homebrew Developer",
-  "game_style": "2D / 2.5D",
+  "game_style": "2D / 2.5D RPG",
   "background": "#18365c",
   "player_color": "#f4d35e",
   "player_x": 560,
@@ -11,5 +11,15 @@
   "player_height": 80,
   "player_speed": 6,
   "animations": {},
-  "active_animation": ""
+  "active_animation": "",
+  "directional_animations": {
+    "idle_down": "",
+    "idle_left": "",
+    "idle_right": "",
+    "idle_up": "",
+    "walk_down": "",
+    "walk_left": "",
+    "walk_right": "",
+    "walk_up": ""
+  }
 }

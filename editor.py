@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
-"""Utopia Game Studio 0.3 - 2D/2.5D Wii U homebrew editor."""
+"""Utopia Game Studio 0.4 - RPG-focused 2D/2.5D Wii U homebrew editor."""
 import base64, json, shutil
 from pathlib import Path
 import tkinter as tk
 from tkinter import colorchooser, filedialog, messagebox, simpledialog, ttk
 from blueprint_editor import BlueprintPanel, default_graph
 
-APP_NAME, VERSION = "Utopia Game Studio", "0.3"
+APP_NAME, VERSION = "Utopia Game Studio", "0.4"
 ROOT = Path(__file__).resolve().parent
 TEMPLATE = ROOT / "runtime_template"
-DEFAULT = {"format":"utopia-project-3","title":"My Utopia Game","author":"Homebrew Developer",
- "game_style":"2D / 2.5D","background":"#18365c","player_color":"#f4d35e",
+ANIMATION_STATES=("idle_down","idle_left","idle_right","idle_up","walk_down","walk_left","walk_right","walk_up")
+DEFAULT = {"format":"utopia-project-4","title":"My Utopia RPG","author":"Homebrew Developer",
+ "game_style":"2D / 2.5D RPG","background":"#18365c","player_color":"#f4d35e",
  "player_x":560,"player_y":320,"player_width":80,"player_height":80,"player_speed":6,
- "animations":{},"active_animation":"","blueprint":default_graph()}
+ "animations":{},"active_animation":"","directional_animations":{key:"" for key in ANIMATION_STATES},"blueprint":default_graph()}
 
 def fresh(): return json.loads(json.dumps(DEFAULT))
 def rgba(value): return "0x" + value.lstrip("#").upper() + "FFu"
@@ -47,7 +48,7 @@ class Editor(tk.Tk):
   self.active_box.grid(row=row,column=1,padx=(8,0)); self.active_box.bind("<<ComboboxSelected>>",self.active_changed)
   ttk.Button(panel,text="Background color",command=lambda:self.pick("background")).grid(row=row+1,column=0,columnspan=2,sticky="ew",pady=(14,4))
   ttk.Button(panel,text="Fallback character color",command=lambda:self.pick("player_color")).grid(row=row+2,column=0,columnspan=2,sticky="ew")
-  ttk.Label(panel,text="Drag the character to position it.\nA rectangle is used until frames exist.").grid(row=row+3,column=0,columnspan=2,sticky="w",pady=16)
+  ttk.Label(panel,text="Drag the character to position it.\nA rectangle is used until frames exist.\nDirectional states are assigned on the\nAnimated Character tab.").grid(row=row+3,column=0,columnspan=2,sticky="w",pady=16)
   self.canvas=tk.Canvas(view,width=640,height=360,highlightthickness=1,highlightbackground="#777"); self.canvas.pack(fill="both",expand=True)
   self.canvas.bind("<Configure>",lambda _e:self.redraw()); self.canvas.bind("<Button-1>",self.drag_start); self.canvas.bind("<B1-Motion>",self.drag_move); self.canvas.bind("<ButtonRelease-1>",lambda _e:setattr(self,"drag",None))
 
@@ -65,7 +66,13 @@ class Editor(tk.Tk):
   self.loop=tk.BooleanVar(value=True); ttk.Checkbutton(opts,text="Loop",variable=self.loop,command=self.options_changed).pack(side="left")
   self.anim_canvas=tk.Canvas(right,width=280,height=280,background="#303030",highlightthickness=1,highlightbackground="#777"); self.anim_canvas.pack(pady=12)
   buttons=ttk.Frame(right); buttons.pack(); ttk.Button(buttons,text="Play",command=self.play).pack(side="left",padx=3); ttk.Button(buttons,text="Stop",command=self.stop).pack(side="left",padx=3)
-  ttk.Label(right,text="PNG only • Maximum 128×128\nAll frames must match size.",justify="center").pack(pady=12)
+  ttk.Label(right,text="PNG only • Maximum 128×128\nAll frames in one animation must match.",justify="center").pack(pady=(12,5))
+  roles=ttk.LabelFrame(right,text="RPG directional states",padding=6);roles.pack(fill="x",padx=4,pady=4)
+  self.direction_vars={}
+  labels=(("idle_down","Idle down"),("walk_down","Walk down"),("idle_left","Idle left"),("walk_left","Walk left"),("idle_right","Idle right"),("walk_right","Walk right"),("idle_up","Idle up"),("walk_up","Walk up"))
+  for row,(key,label) in enumerate(labels):
+   ttk.Label(roles,text=label).grid(row=row,column=0,sticky="w",pady=1);var=tk.StringVar();self.direction_vars[key]=var
+   box=ttk.Combobox(roles,textvariable=var,state="readonly",width=15);box.grid(row=row,column=1,sticky="ew",padx=(5,0),pady=1);box.bind("<<ComboboxSelected>>",lambda _e,k=key:self.direction_changed(k));setattr(self,"direction_box_"+key,box)
 
  def names(self): return list(self.project["animations"])
  def selected_anim(self):
@@ -76,6 +83,8 @@ class Editor(tk.Tk):
   return self.photos[key]
  def load_project(self):
   for k,v in self.vars.items():v.set(str(self.project[k]))
+  self.project.setdefault("directional_animations",{})
+  for key in ANIMATION_STATES:self.project["directional_animations"].setdefault(key,"")
   self.photos.clear(); self.refresh_animations(); self.blueprint.refresh(); self.redraw()
  def fields_changed(self):
   for k in ("title","author"):self.project[k]=self.vars[k].get()
@@ -89,6 +98,11 @@ class Editor(tk.Tk):
   self.active_box["values"]=[""]+n; active=self.project.get("active_animation","")
   if active not in n:active=n[0] if n else ""; self.project["active_animation"]=active
   self.active.set(active)
+  for key in ANIMATION_STATES:
+   box=getattr(self,"direction_box_"+key);box["values"]=[""]+n
+   assigned=self.project["directional_animations"].get(key,"")
+   if assigned not in n:assigned="";self.project["directional_animations"][key]=""
+   self.direction_vars[key].set(assigned)
   if n:
    target=choose if choose in n else active; i=n.index(target) if target in n else 0; self.anim_list.selection_set(i)
   self.refresh_frames(); self.redraw()
@@ -154,6 +168,8 @@ class Editor(tk.Tk):
  def stop(self):
   if self.job is not None:self.after_cancel(self.job);self.job=None
  def active_changed(self,_e=None):self.project["active_animation"]=self.active.get();self.redraw()
+ def direction_changed(self,key):
+  self.project["directional_animations"][key]=self.direction_vars[key].get()
 
  def redraw(self,index=0):
   if not hasattr(self,"canvas"):return
@@ -180,8 +196,8 @@ class Editor(tk.Tk):
   if not path:return
   try:
    data=json.loads(Path(path).read_text(encoding="utf-8"))
-   if data.get("format") not in ("utopia-project-3","utopia-project-2","wugc-project-1"):raise ValueError("Unsupported project format")
-   data["format"]="utopia-project-3";self.project={**fresh(),**data};self.project.setdefault("animations",{});self.project.setdefault("blueprint",default_graph());self.project_path=Path(path);self.load_project();self.status.set(f"Opened {Path(path).name}")
+   if data.get("format") not in ("utopia-project-4","utopia-project-3","utopia-project-2","wugc-project-1"):raise ValueError("Unsupported project format")
+   data["format"]="utopia-project-4";self.project={**fresh(),**data};self.project.setdefault("animations",{});self.project.setdefault("directional_animations",{});self.project.setdefault("blueprint",default_graph());self.project_path=Path(path);self.load_project();self.status.set(f"Opened {Path(path).name}")
   except Exception as e:messagebox.showerror(APP_NAME,f"Open failed:\n{e}")
  def save(self):
   if self.project_path is None:return self.save_as()
@@ -192,9 +208,13 @@ class Editor(tk.Tk):
   self.project_path=Path(path);return self.save()
 
  def write_frames(self,out):
-  a=self.project["animations"].get(self.project.get("active_animation",""),{});frames=a.get("frames",[]);lines=["#pragma once","#include <stdint.h>",f"#define HAS_ANIMATION {int(bool(frames))}"]
-  if not frames:lines += ["#define FRAME_COUNT 0","#define FRAME_WIDTH 1","#define FRAME_HEIGHT 1","#define FRAME_DELAY 1","#define ANIMATION_LOOP 1"]
-  else:
+  lines=["#pragma once","#include <stdint.h>","typedef struct { const uint32_t *const *frames; unsigned int count, width, height, delay, loop; } UtopiaAnimation;"]
+  assigned=self.project.get("directional_animations",{});fallback=self.project.get("active_animation","")
+  has_any=False;written={}
+  for state in ANIMATION_STATES:
+   name=assigned.get(state,"") or fallback;a=self.project["animations"].get(name,{});frames=a.get("frames",[]);has_any=has_any or bool(frames)
+   if frames and name in written:
+    lines.append(f"#define ANIM_{state.upper()} ANIM_{written[name].upper()}");continue
    for n,frame in enumerate(frames):
     pic=self.photo(frame);pixels=[]
     for y in range(pic.height()):
@@ -205,10 +225,15 @@ class Editor(tk.Tk):
        if isinstance(c,str):c=c.lstrip("#");r,g,b=[int(c[i:i+2],16) for i in (0,2,4)]
        else:r,g,b=c[:3]
        pixels.append(f"0x{r:02X}{g:02X}{b:02X}FFu")
-    lines.append(f"static const uint32_t frame_{n}[] = {{")
+    lines.append(f"static const uint32_t anim_{state}_frame_{n}[] = {{")
     for i in range(0,len(pixels),8):lines.append("    "+", ".join(pixels[i:i+8]) + ",")
     lines.append("};")
-   lines += [f"#define FRAME_COUNT {len(frames)}",f"#define FRAME_WIDTH {frames[0]['width']}",f"#define FRAME_HEIGHT {frames[0]['height']}",f"#define FRAME_DELAY {max(1,60//max(1,a.get('fps',8)))}",f"#define ANIMATION_LOOP {int(a.get('loop',True))}","static const uint32_t *const animation_frames[FRAME_COUNT] = {"+", ".join(f"frame_{i}" for i in range(len(frames)))+"};"]
+   if frames:
+    written[name]=state
+    lines.append(f"static const uint32_t *const anim_{state}_frames[] = {{"+", ".join(f"anim_{state}_frame_{i}" for i in range(len(frames)))+"};")
+    lines.append(f"static const UtopiaAnimation ANIM_{state.upper()} = {{anim_{state}_frames, {len(frames)}, {frames[0]['width']}, {frames[0]['height']}, {max(1,60//max(1,a.get('fps',8)))}, {int(a.get('loop',True))}}};")
+   else:lines.append(f"static const UtopiaAnimation ANIM_{state.upper()} = {{0, 0, 1, 1, 1, 1}};")
+  lines.insert(2,f"#define HAS_ANIMATION {int(has_any)}")
   (out/"source"/"animation_frames.h").write_text("\n".join(lines)+"\n",encoding="utf-8")
  def export(self):
   folder=filedialog.askdirectory(title="Choose export destination")
