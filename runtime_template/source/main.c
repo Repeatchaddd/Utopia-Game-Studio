@@ -4,6 +4,7 @@
 #include <whb/proc.h>
 #include "game_config.h"
 #include "animation_frames.h"
+#include "blueprint_logic.h"
 
 static void fill_rect(OSScreenID screen, int x, int y, int w, int h, uint32_t color,
                       int logical_w, int logical_h)
@@ -70,10 +71,18 @@ int main(int argc, char **argv)
     while (WHBProcIsRunning()) {
         VPADRead(VPAD_CHAN_0, &input, 1, &error);
         if (error == VPAD_READ_SUCCESS) {
+#if BP_MOVE_LEFT
             if (input.hold & VPAD_BUTTON_LEFT)  x -= PLAYER_SPEED;
+#endif
+#if BP_MOVE_RIGHT
             if (input.hold & VPAD_BUTTON_RIGHT) x += PLAYER_SPEED;
+#endif
+#if BP_MOVE_UP
             if (input.hold & VPAD_BUTTON_UP)    y -= PLAYER_SPEED;
+#endif
+#if BP_MOVE_DOWN
             if (input.hold & VPAD_BUTTON_DOWN)  y += PLAYER_SPEED;
+#endif
             if (input.trigger & VPAD_BUTTON_PLUS) break;
         }
         if (x < 0) x = 0;
