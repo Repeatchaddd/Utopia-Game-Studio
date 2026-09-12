@@ -3,6 +3,7 @@
 #include <vpad/input.h>
 #include <whb/proc.h>
 #include "game_config.h"
+#include "animation_frames.h"
 
 static void fill_rect(OSScreenID screen, int x, int y, int w, int h, uint32_t color,
                       int logical_w, int logical_h)
@@ -19,6 +20,26 @@ static void fill_rect(OSScreenID screen, int x, int y, int w, int h, uint32_t co
         for (int px = left; px < right; ++px)
             OSScreenPutPixelEx(screen, px, py, color);
 }
+
+#if HAS_ANIMATION
+static void draw_frame(OSScreenID screen, int x, int y, int w, int h, const uint32_t *pixels)
+{
+    int out_w = screen == SCREEN_TV ? 1280 : 854;
+    int out_h = screen == SCREEN_TV ? 720 : 480;
+    int left = x * out_w / 1280;
+    int top = y * out_h / 720;
+    int draw_w = w * out_w / 1280;
+    int draw_h = h * out_h / 720;
+    for (int dy = 0; dy < draw_h; ++dy) {
+        int source_y = dy * FRAME_HEIGHT / draw_h;
+        for (int dx = 0; dx < draw_w; ++dx) {
+            int source_x = dx * FRAME_WIDTH / draw_w;
+            uint32_t color = pixels[source_y * FRAME_WIDTH + source_x];
+            if (color != 0) OSScreenPutPixelEx(screen, left + dx, top + dy, color);
+        }
+    }
+}
+#endif
 
 int main(int argc, char **argv)
 {
@@ -44,6 +65,8 @@ int main(int argc, char **argv)
     int x = START_X, y = START_Y;
     VPADStatus input;
     VPADReadError error;
+    unsigned int animation_tick = 0;
+    unsigned int animation_frame = 0;
     while (WHBProcIsRunning()) {
         VPADRead(VPAD_CHAN_0, &input, 1, &error);
         if (error == VPAD_READ_SUCCESS) {
@@ -60,8 +83,18 @@ int main(int argc, char **argv)
 
         OSScreenClearBufferEx(SCREEN_TV, BACKGROUND_COLOR);
         OSScreenClearBufferEx(SCREEN_DRC, BACKGROUND_COLOR);
+#if HAS_ANIMATION
+        draw_frame(SCREEN_TV, x, y, PLAYER_W, PLAYER_H, animation_frames[animation_frame]);
+        draw_frame(SCREEN_DRC, x, y, PLAYER_W, PLAYER_H, animation_frames[animation_frame]);
+        if (++animation_tick >= FRAME_DELAY) {
+            animation_tick = 0;
+            if (animation_frame + 1 < FRAME_COUNT) ++animation_frame;
+            else if (ANIMATION_LOOP) animation_frame = 0;
+        }
+#else
         fill_rect(SCREEN_TV, x, y, PLAYER_W, PLAYER_H, PLAYER_COLOR, 1280, 720);
         fill_rect(SCREEN_DRC, x, y, PLAYER_W, PLAYER_H, PLAYER_COLOR, 1280, 720);
+#endif
         OSScreenFlipBuffersEx(SCREEN_TV);
         OSScreenFlipBuffersEx(SCREEN_DRC);
     }
