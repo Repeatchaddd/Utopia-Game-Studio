@@ -1,5 +1,5 @@
 #pragma once
-#define GAME_TITLE "Wii U Movement Test"
+#define GAME_TITLE "Utopia Animation Test"
 #define START_X 560
 #define START_Y 320
 #define PLAYER_W 80
