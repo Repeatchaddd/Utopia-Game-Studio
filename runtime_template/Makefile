@@ -5,9 +5,9 @@ $(error "DEVKITPRO is not set. Run make from the devkitPro MSYS2 shell")
 endif
 
 TOPDIR ?= $(CURDIR)
-APP_NAME := Wii U Game Creator Test
-APP_SHORTNAME := WUGC Test
-APP_AUTHOR := WUGC
+APP_NAME := Utopia Game Studio Test
+APP_SHORTNAME := Utopia Test
+APP_AUTHOR := Utopia
 
 include $(DEVKITPRO)/wut/share/wut_rules
 
