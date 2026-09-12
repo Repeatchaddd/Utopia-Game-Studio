@@ -1,51 +1,50 @@
-# Wii U Game Creator 0.1
+# Utopia Game Studio 0.2
 
-This is a new, independent project. It does not use Next64 code, files, project formats, or versioning.
+Utopia Game Studio is an independent visual creator for native Wii U homebrew games. It focuses exclusively on **2D and 2.5D games** and shares no code, project format, or versioning with Next64.
 
-## What Version 0.1 does
+## Version 0.2
 
-- Runs as a small Windows editor using Python and Tkinter.
-- Creates, opens, and saves `.wugc` JSON projects.
-- Shows a 1280×720 preview with one colored player rectangle.
-- Lets you drag the rectangle or enter its position and size.
-- Exports a native Wii U WUT source project.
-- Generated program draws on the TV and GamePad.
-- Wii U GamePad D-pad moves the rectangle; Plus exits.
+- Creates, opens, and saves `.ugs` projects.
+- Imports PNG frames up to 128×128 pixels.
+- Groups frames into named animations such as `idle`, `walk`, and `jump`.
+- Reorders and deletes frames.
+- Sets animation speed from 1–60 FPS and enables or disables looping.
+- Plays animation previews inside the editor.
+- Assigns one active animation to the character.
+- Exports the active animation as native C pixel data.
+- Animates the character on both TV and GamePad.
+- Moves the character with the GamePad D-pad; Plus exits.
+- Opens and upgrades Version 0.1 `.wugc` projects.
 
-This version intentionally has no sprites, rooms, collision, audio, or visual logic.
+The structure is inspired by the approachable sprite/animation workflow of GameMaker Studio 2, but the implementation and source are original.
 
-## Run the editor on Windows
+## Run on Windows
 
 1. Install Python 3 from https://www.python.org/ and enable **Add Python to PATH**.
 2. Double-click `run_editor.bat`.
-3. Open `sample_project.wugc`, or make a new project.
-4. Choose **Export Wii U Project** and select a destination folder.
+3. Create or select an animation under **Animated Character**.
+4. Import equally sized PNG frames in playback order.
+5. Choose the animation under **Scene → Active animation**.
+6. Save the project and select **Export Wii U Project**.
 
-## Install the Wii U build tools
+PNG files are stored inside the `.ugs` project, making the project portable. Transparent PNG pixels remain transparent in the Wii U export.
 
-Use the open-source devkitPro Wii U toolchain—not Nintendo's proprietary SDK.
+## Build for Aroma
 
-1. Install devkitPro for Windows from https://devkitpro.org/wiki/Getting_Started
-2. Open the **devkitPro MSYS2** terminal.
-3. Install or update the Wii U packages:
+1. Install devkitPro for Windows: https://devkitpro.org/wiki/Getting_Started
+2. Open the devkitPro MSYS2 terminal.
+3. Run `pacman -Syu --needed wiiu-dev`.
+4. Change to the generated `utopia_wiiu_export` directory.
+5. Run `make` to create `game.wuhb`.
+6. Copy it to `wiiu/apps/utopia_test/game.wuhb` on the Aroma SD card.
 
-   `pacman -Syu --needed wiiu-dev`
+## Version 0.2 test order
 
-## Build the exported game
+1. Test the editor with two small, equally sized PNG frames.
+2. Verify Play and Stop, FPS, looping, reordering, save, and reopen.
+3. Export and compile.
+4. Verify animation and D-pad movement on both the TV and GamePad.
 
-1. In the devkitPro MSYS2 terminal, change to the editor-created `wiiu_export` directory.
-2. Run `make`.
-3. A successful build creates `game.wuhb`.
-4. Copy it to `wiiu/apps/wugc_test/game.wuhb` on the Aroma SD card.
-5. Start it from the Wii U Menu. Use the GamePad D-pad; press Plus to exit.
+The native renderer is intentionally simple. Keep initial test frames around 16×16 or 32×32 pixels and display sizes modest while we establish reliable real-hardware behavior.
 
-## First hardware-test checklist
-
-- Application appears on the Aroma Wii U Menu.
-- It launches without returning immediately to the menu.
-- TV and GamePad show the same background and rectangle.
-- All four D-pad directions move correctly.
-- The rectangle stays on screen.
-- Plus exits cleanly.
-
-Please report the exact failed checklist item and, for build failures, paste the complete terminal error.
+Utopia Game Studio is an independent homebrew project and is not affiliated with or endorsed by Nintendo.
