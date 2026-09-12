@@ -1,0 +1,15 @@
+{
+  "format": "utopia-project-2",
+  "title": "Utopia Animation Test",
+  "author": "Homebrew Developer",
+  "game_style": "2D / 2.5D",
+  "background": "#18365c",
+  "player_color": "#f4d35e",
+  "player_x": 560,
+  "player_y": 320,
+  "player_width": 80,
+  "player_height": 80,
+  "player_speed": 6,
+  "animations": {},
+  "active_animation": ""
+}
