@@ -1,5 +1,12 @@
 #pragma once
 #define BP_MOVE_LEFT 1
+#define BP_MOVE_LEFT_SPEED 100
 #define BP_MOVE_RIGHT 1
+#define BP_MOVE_RIGHT_SPEED 100
 #define BP_MOVE_UP 1
+#define BP_MOVE_UP_SPEED 100
 #define BP_MOVE_DOWN 1
+#define BP_MOVE_DOWN_SPEED 100
+#define BP_RUN_ENABLED 1
+#define BP_RUN_BUTTON VPAD_BUTTON_B
+#define BP_RUN_SPEED 175

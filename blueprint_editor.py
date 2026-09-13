@@ -2,16 +2,46 @@
 import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
 
-NODE_COLORS={"Start":"#6b4f8a","Update":"#8a4f6b","GamePad Input":"#315d83","Move Character":"#3f7a55"}
+NODE_COLORS={"Start":"#6b4f8a","Update":"#8a4f6b","GamePad Input":"#315d83","Move Character":"#3f7a55","Run Modifier":"#8a6335"}
 BUTTONS=("LEFT","RIGHT","UP","DOWN","A","B","X","Y")
+DIRECTIONS={"Left":(-1,0),"Right":(1,0),"Up":(0,-1),"Down":(0,1)}
+
+class MovePropertiesDialog(simpledialog.Dialog):
+ def __init__(self,parent,props):self.props=props;self.result=None;super().__init__(parent,"Move Character")
+ def body(self,parent):
+  ttk.Label(parent,text="Direction").grid(row=0,column=0,sticky="w",pady=5);current=next((name for name,value in DIRECTIONS.items() if value==(self.props.get("dx",1),self.props.get("dy",0))),"Right")
+  self.direction=tk.StringVar(value=current);ttk.Combobox(parent,textvariable=self.direction,values=list(DIRECTIONS),state="readonly",width=18).grid(row=0,column=1,padx=(8,0),pady=5)
+  ttk.Label(parent,text="Speed").grid(row=1,column=0,sticky="w",pady=5);self.speed=tk.StringVar(value=str(self.props.get("speed_percent",100)))
+  speed=ttk.Spinbox(parent,textvariable=self.speed,from_=1,to=400,width=8);speed.grid(row=1,column=1,sticky="w",padx=(8,0),pady=5);ttk.Label(parent,text="% of project movement speed").grid(row=1,column=2,sticky="w",padx=(5,0))
+  return speed
+ def validate(self):
+  try:value=int(self.speed.get())
+  except ValueError:value=0
+  if not 1<=value<=400:messagebox.showerror("Utopia Game Studio","Speed must be from 1% through 400%.",parent=self);return False
+  return True
+ def apply(self):self.result=(*DIRECTIONS[self.direction.get()],int(self.speed.get()))
+
+class RunPropertiesDialog(simpledialog.Dialog):
+ def __init__(self,parent,props):self.props=props;self.result=None;super().__init__(parent,"Run Modifier")
+ def body(self,parent):
+  ttk.Label(parent,text="Running speed").grid(row=0,column=0,sticky="w",pady=5);self.speed=tk.StringVar(value=str(self.props.get("speed_percent",175)))
+  speed=ttk.Spinbox(parent,textvariable=self.speed,from_=101,to=400,width=8);speed.grid(row=0,column=1,sticky="w",padx=(8,0),pady=5);ttk.Label(parent,text="% of walking speed").grid(row=0,column=2,sticky="w",padx=(5,0));return speed
+ def validate(self):
+  try:value=int(self.speed.get())
+  except ValueError:value=0
+  if not 101<=value<=400:messagebox.showerror("Utopia Game Studio","Running speed must be from 101% through 400%.",parent=self);return False
+  return True
+ def apply(self):self.result=int(self.speed.get())
 
 def default_graph():
  nodes=[];links=[];ident=1
  nodes.append({"id":ident,"type":"Update","x":40,"y":40,"props":{}});ident+=1
  for row,(button,dx,dy) in enumerate((("LEFT",-1,0),("RIGHT",1,0),("UP",0,-1),("DOWN",0,1))):
   source=ident;nodes.append({"id":source,"type":"GamePad Input","x":260,"y":30+row*115,"props":{"button":button}});ident+=1
-  target=ident;nodes.append({"id":target,"type":"Move Character","x":520,"y":30+row*115,"props":{"dx":dx,"dy":dy}});ident+=1
+  target=ident;nodes.append({"id":target,"type":"Move Character","x":520,"y":30+row*115,"props":{"dx":dx,"dy":dy,"speed_percent":100}});ident+=1
   links.append({"from":source,"to":target})
+ source=ident;nodes.append({"id":source,"type":"GamePad Input","x":260,"y":490,"props":{"button":"B"}});ident+=1
+ target=ident;nodes.append({"id":target,"type":"Run Modifier","x":520,"y":490,"props":{"speed_percent":175}});ident+=1;links.append({"from":source,"to":target})
  return {"next_id":ident,"nodes":nodes,"links":links}
 
 class BlueprintPanel(ttk.Frame):
@@ -45,7 +75,9 @@ class BlueprintPanel(ttk.Frame):
   self.canvas.create_text(x+8,y+13,text=n["type"],anchor="w",fill="white",font=("Segoe UI",10,"bold"),tags=(tag,"node"))
   props=n.get("props",{});detail=""
   if n["type"]=="GamePad Input":detail="Button: "+props.get("button","A")
-  elif n["type"]=="Move Character":detail=f"Direction: {props.get('dx',0)}, {props.get('dy',0)}"
+  elif n["type"]=="Move Character":
+   direction=next((name for name,value in DIRECTIONS.items() if value==(props.get("dx",0),props.get("dy",0))),f"{props.get('dx',0)}, {props.get('dy',0)}");detail=f"{direction} • Speed: {props.get('speed_percent',100)}%"
+  elif n["type"]=="Run Modifier":detail=f"Running speed: {props.get('speed_percent',175)}%"
   else:detail="Execution event"
   self.canvas.create_text(x+10,y+51,text=detail,anchor="w",fill="#d7dce2",tags=(tag,"node"))
  def event_node(self,e):
@@ -68,7 +100,8 @@ class BlueprintPanel(ttk.Frame):
  def add_node(self):
   g=self.graph();kind=self.kind.get();props={}
   if kind=="GamePad Input":props={"button":"A"}
-  if kind=="Move Character":props={"dx":1,"dy":0}
+  if kind=="Move Character":props={"dx":1,"dy":0,"speed_percent":100}
+  if kind=="Run Modifier":props={"speed_percent":175}
   ident=g["next_id"];g["next_id"]+=1;g["nodes"].append({"id":ident,"type":kind,"x":80+len(g["nodes"])*25,"y":80+len(g["nodes"])*20,"props":props});self.selected=ident;self.refresh()
  def begin_link(self):
   if self.selected is None:messagebox.showinfo("Utopia Game Studio","Select the source node first.");return
@@ -81,24 +114,34 @@ class BlueprintPanel(ttk.Frame):
    if value and value.upper() in BUTTONS:n["props"]["button"]=value.upper()
    elif value:messagebox.showerror("Utopia Game Studio","Unsupported GamePad button.")
   elif n["type"]=="Move Character":
-   value=simpledialog.askstring("Move Character","Direction as X,Y (-1,0 moves left):",initialvalue=f"{n['props'].get('dx',0)},{n['props'].get('dy',0)}")
-   try:
-    if value:
-     dx,dy=(int(x.strip()) for x in value.split(","));n["props"].update(dx=max(-1,min(1,dx)),dy=max(-1,min(1,dy)))
-   except ValueError:messagebox.showerror("Utopia Game Studio","Enter two whole numbers separated by a comma.")
+   dialog=MovePropertiesDialog(self,n["props"])
+   if dialog.result:
+    dx,dy,speed=dialog.result;n["props"].update(dx=dx,dy=dy,speed_percent=speed)
+  elif n["type"]=="Run Modifier":
+   dialog=RunPropertiesDialog(self,n["props"])
+   if dialog.result:n["props"]["speed_percent"]=dialog.result
   self.refresh()
  def delete_node(self):
   if self.selected is None:return
   g=self.graph();g["nodes"]=[n for n in g["nodes"] if n["id"]!=self.selected];g["links"]=[x for x in g["links"] if self.selected not in (x["from"],x["to"])];self.selected=None;self.refresh()
  def clear_links(self):
   if messagebox.askyesno("Utopia Game Studio","Remove every blueprint connection?"):self.graph()["links"]=[];self.refresh()
- def write_header(self,path):
-  g=self.graph();lookup={n["id"]:n for n in g["nodes"]};moves={b:False for b in ("LEFT","RIGHT","UP","DOWN")}
+ def movement_config(self):
+  g=self.graph();lookup={n["id"]:n for n in g["nodes"]};moves={b:0 for b in ("LEFT","RIGHT","UP","DOWN")};run_button="B";run_speed=0
   for link in g["links"]:
    a,b=lookup.get(link["from"]),lookup.get(link["to"])
-   if not a or not b or a["type"]!="GamePad Input" or b["type"]!="Move Character":continue
-   button=a["props"].get("button","");dx,dy=b["props"].get("dx",0),b["props"].get("dy",0)
-   if button in moves:
-    expected={"LEFT":(-1,0),"RIGHT":(1,0),"UP":(0,-1),"DOWN":(0,1)}[button];moves[button]=(dx,dy)==expected
-  text="#pragma once\n"+"\n".join(f"#define BP_MOVE_{k} {int(v)}" for k,v in moves.items())+"\n"
+   if not a or not b or a["type"]!="GamePad Input":continue
+   button=a["props"].get("button","")
+   if b["type"]=="Run Modifier" and button in BUTTONS:run_button=button;run_speed=max(101,min(400,int(b["props"].get("speed_percent",175))));continue
+   if b["type"]=="Move Character" and button in moves:
+    dx,dy=b["props"].get("dx",0),b["props"].get("dy",0)
+    expected={"LEFT":(-1,0),"RIGHT":(1,0),"UP":(0,-1),"DOWN":(0,1)}[button]
+    if (dx,dy)==expected:moves[button]=max(1,min(400,int(b["props"].get("speed_percent",100))))
+  return moves,run_button,run_speed
+ def write_header(self,path):
+  moves,run_button,run_speed=self.movement_config()
+  lines=["#pragma once"]
+  for key,speed in moves.items():lines.extend((f"#define BP_MOVE_{key} {int(bool(speed))}",f"#define BP_MOVE_{key}_SPEED {speed or 100}"))
+  lines.extend((f"#define BP_RUN_ENABLED {int(bool(run_speed))}",f"#define BP_RUN_BUTTON VPAD_BUTTON_{run_button}",f"#define BP_RUN_SPEED {run_speed or 175}"))
+  text="\n".join(lines)+"\n"
   path.write_text(text,encoding="utf-8")

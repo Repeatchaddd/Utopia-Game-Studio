@@ -1,22 +1,175 @@
 #!/usr/bin/env python3
-"""Utopia Game Studio 0.4 - RPG-focused 2D/2.5D Wii U homebrew editor."""
-import base64, json, shutil
+"""Utopia Game Studio 0.75 - RPG-focused 2D/2.5D Wii U homebrew editor."""
+import base64, json, shutil, struct, zlib
 from pathlib import Path
 import tkinter as tk
 from tkinter import colorchooser, filedialog, messagebox, simpledialog, ttk
 from blueprint_editor import BlueprintPanel, default_graph
 
-APP_NAME, VERSION = "Utopia Game Studio", "0.4"
+APP_NAME, VERSION = "Utopia Game Studio", "0.75"
 ROOT = Path(__file__).resolve().parent
 TEMPLATE = ROOT / "runtime_template"
 ANIMATION_STATES=("idle_down","idle_left","idle_right","idle_up","walk_down","walk_left","walk_right","walk_up")
-DEFAULT = {"format":"utopia-project-4","title":"My Utopia RPG","author":"Homebrew Developer",
+DEFAULT = {"format":"utopia-project-5","title":"My Utopia RPG","author":"Homebrew Developer",
  "game_style":"2D / 2.5D RPG","background":"#18365c","player_color":"#f4d35e",
  "player_x":560,"player_y":320,"player_width":80,"player_height":80,"player_speed":6,
  "animations":{},"active_animation":"","directional_animations":{key:"" for key in ANIMATION_STATES},"blueprint":default_graph()}
 
 def fresh(): return json.loads(json.dumps(DEFAULT))
 def rgba(value): return "0x" + value.lstrip("#").upper() + "FFu"
+
+def png_rgba(width,height,pixels):
+ def chunk(kind,data):
+  return struct.pack(">I",len(data))+kind+data+struct.pack(">I",zlib.crc32(kind+data)&0xffffffff)
+ raw=b"".join(b"\0"+bytes(channel for pixel in pixels[y*width:(y+1)*width] for channel in pixel) for y in range(height))
+ return b"\x89PNG\r\n\x1a\n"+chunk(b"IHDR",struct.pack(">IIBBBBB",width,height,8,6,0,0,0))+chunk(b"IDAT",zlib.compress(raw,9))+chunk(b"IEND",b"")
+
+class PixelFrameEditor(tk.Toplevel):
+ def __init__(self,parent,width,height,pixels=None,title="Create frame",copy_sources=None):
+  super().__init__(parent);self.title(title);self.transient(parent);self.resizable(False,False);self.result=None
+  self.width,self.height=width,height;self.pixels=list(pixels or [(0,0,0,0)]*(width*height));self.color="#f4d35e";self.cells=[];self.shape_start=None;self.shape_base=None
+  self.scale=max(4,min(20,512//max(width,height)));cw,ch=width*self.scale,height*self.scale
+  tools=ttk.Frame(self,padding=8);tools.pack(fill="x");self.tool=tk.StringVar(value="pencil");self.filled=tk.BooleanVar(value=False)
+  self.color_button=tk.Button(tools,text="Draw color",background=self.color,command=self.choose_color);self.color_button.grid(row=0,column=0,padx=(0,5))
+  ttk.Button(tools,text="Eraser",command=lambda:setattr(self,"color",None)).grid(row=0,column=1,padx=(0,5));ttk.Button(tools,text="Clear",command=self.clear).grid(row=0,column=2,padx=(0,10))
+  for column,(value,label) in enumerate((("pencil","Pencil"),("line","Line"),("rectangle","Rectangle"),("ellipse","Ellipse")),3):ttk.Radiobutton(tools,text=label,value=value,variable=self.tool).grid(row=0,column=column,padx=2)
+  ttk.Checkbutton(tools,text="Filled",variable=self.filled).grid(row=0,column=7,padx=(8,0))
+  self.copy_sources={label:list(source_pixels) for label,source_pixels in (copy_sources or [])};self.copy_choice=tk.StringVar()
+  if self.copy_sources:
+   copy_box=ttk.Combobox(tools,textvariable=self.copy_choice,values=list(self.copy_sources),state="readonly",width=28);copy_box.grid(row=1,column=0,columnspan=4,sticky="ew",pady=(6,0));copy_box.current(0)
+   ttk.Button(tools,text="Copy frame into current",command=self.copy_frame).grid(row=1,column=4,columnspan=4,sticky="ew",padx=(6,0),pady=(6,0))
+  ttk.Label(tools,text="Left-drag draws • Right-drag erases").grid(row=2,column=0,columnspan=8,sticky="w",pady=(5,0))
+  self.canvas=tk.Canvas(self,width=cw,height=ch,background="#707070",highlightthickness=1,highlightbackground="#333");self.canvas.pack(padx=8)
+  for y in range(height):
+   for x in range(width):
+    item=self.canvas.create_rectangle(x*self.scale,y*self.scale,(x+1)*self.scale,(y+1)*self.scale,outline="#555",width=1)
+    self.cells.append(item);self.paint_cell(x,y,False)
+  self.canvas.bind("<ButtonPress-1>",self.draw_start);self.canvas.bind("<B1-Motion>",self.draw_drag);self.canvas.bind("<ButtonRelease-1>",self.draw_end);self.canvas.bind("<Button-3>",self.erase);self.canvas.bind("<B3-Motion>",self.erase)
+  buttons=ttk.Frame(self,padding=8);buttons.pack(fill="x");ttk.Button(buttons,text="Cancel",command=self.destroy).pack(side="right");ttk.Button(buttons,text="Save frame",command=self.save).pack(side="right",padx=6)
+  self.protocol("WM_DELETE_WINDOW",self.destroy);self.wait_visibility();self.grab_set();self.focus_set()
+ def choose_color(self):
+  value=colorchooser.askcolor(self.color or "#f4d35e",parent=self)[1]
+  if value:self.color=value;self.color_button.configure(background=value)
+ def paint_cell(self,x,y,set_pixel=True,erase=False):
+  if not (0<=x<self.width and 0<=y<self.height):return
+  i=y*self.width+x
+  if set_pixel:
+   if erase or self.color is None:self.pixels[i]=(0,0,0,0)
+   else:
+    c=self.color.lstrip("#");self.pixels[i]=tuple(int(c[n:n+2],16) for n in (0,2,4))+(255,)
+  r,g,b,a=self.pixels[i];fill=f"#{r:02x}{g:02x}{b:02x}" if a else ("#b8b8b8" if (x+y)%2 else "#e0e0e0")
+  self.canvas.itemconfigure(self.cells[i],fill=fill)
+ def event_cell(self,event,erase=False):self.paint_cell(event.x//self.scale,event.y//self.scale,True,erase)
+ def event_xy(self,event):return max(0,min(self.width-1,event.x//self.scale)),max(0,min(self.height-1,event.y//self.scale))
+ def draw_start(self,event):
+  if self.tool.get()=="pencil":self.event_cell(event);return
+  self.shape_start=self.event_xy(event);self.shape_base=list(self.pixels);self.draw_shape(self.shape_start)
+ def draw_drag(self,event):
+  if self.tool.get()=="pencil":self.event_cell(event)
+  elif self.shape_start:self.draw_shape(self.event_xy(event))
+ def draw_end(self,event):
+  if self.tool.get()!="pencil" and self.shape_start:self.draw_shape(self.event_xy(event))
+  self.shape_start=None;self.shape_base=None
+ def line_points(self,x0,y0,x1,y1):
+  points=[];dx=abs(x1-x0);sx=1 if x0<x1 else -1;dy=-abs(y1-y0);sy=1 if y0<y1 else -1;error=dx+dy
+  while True:
+   points.append((x0,y0))
+   if x0==x1 and y0==y1:return points
+   twice=2*error
+   if twice>=dy:error+=dy;x0+=sx
+   if twice<=dx:error+=dx;y0+=sy
+ def shape_points(self,x0,y0,x1,y1):
+  tool=self.tool.get()
+  if tool=="line":return self.line_points(x0,y0,x1,y1)
+  left,right=sorted((x0,x1));top,bottom=sorted((y0,y1));filled=self.filled.get()
+  if tool=="rectangle":
+   if filled:return [(x,y) for y in range(top,bottom+1) for x in range(left,right+1)]
+   return list(dict.fromkeys([(x,top) for x in range(left,right+1)]+[(x,bottom) for x in range(left,right+1)]+[(left,y) for y in range(top,bottom+1)]+[(right,y) for y in range(top,bottom+1)]))
+  cx,cy=(left+right)/2,(top+bottom)/2;rx,ry=max(.5,(right-left)/2),max(.5,(bottom-top)/2);points=[]
+  for y in range(top,bottom+1):
+   for x in range(left,right+1):
+    inside=((x-cx)/rx)**2+((y-cy)/ry)**2<=1.08
+    if not inside:continue
+    edge=any(((x+dx-cx)/rx)**2+((y+dy-cy)/ry)**2>1.08 for dx,dy in ((-1,0),(1,0),(0,-1),(0,1)))
+    if filled or edge:points.append((x,y))
+  return points
+ def draw_shape(self,end):
+  previous=self.pixels;updated=list(self.shape_base);x0,y0=self.shape_start;x1,y1=end
+  for x,y in self.shape_points(x0,y0,x1,y1):
+   i=y*self.width+x
+   if self.color is None:updated[i]=(0,0,0,0)
+   else:
+    c=self.color.lstrip("#");updated[i]=tuple(int(c[n:n+2],16) for n in (0,2,4))+(255,)
+  self.pixels=updated
+  for i,(old,new) in enumerate(zip(previous,updated)):
+   if old!=new:self.paint_cell(i%self.width,i//self.width,False)
+ def erase(self,event):self.event_cell(event,True)
+ def redraw_cells(self):
+  for y in range(self.height):
+   for x in range(self.width):self.paint_cell(x,y,False)
+ def clear(self):
+  self.pixels=[(0,0,0,0)]*(self.width*self.height)
+  self.redraw_cells()
+ def copy_frame(self):
+  source=self.copy_sources.get(self.copy_choice.get())
+  if source is not None:self.pixels=list(source);self.shape_start=None;self.shape_base=None;self.redraw_cells()
+ def save(self):self.result=base64.b64encode(png_rgba(self.width,self.height,self.pixels)).decode("ascii");self.destroy()
+
+class TestRunner(tk.Toplevel):
+ KEY_GROUPS={"LEFT":{"left","a"},"RIGHT":{"right","d"},"UP":{"up","w"},"DOWN":{"down","s"}}
+ BUTTON_KEYS={"A":"z","B":"x","X":"c","Y":"v"}
+ def __init__(self,parent,project,movement):
+  super().__init__(parent);self.title(f"{APP_NAME} Test Run");self.geometry("960x600");self.minsize(640,400);self.project=json.loads(json.dumps(project));self.moves,self.run_button,self.run_speed=movement
+  self.pressed=set();self.x=float(self.project["player_x"]);self.y=float(self.project["player_y"]);self.facing="down";self.frame=0;self.anim_tick=0;self.last_anim=None;self.photos={};self.closed=False
+  info=ttk.Frame(self,padding=6);info.pack(fill="x");ttk.Label(info,text="Move: Arrow keys or WASD   •   Run: Shift or configured button (A=Z, B=X, X=C, Y=V)   •   Esc: Stop",anchor="center").pack(fill="x")
+  self.canvas=tk.Canvas(self,background=self.project["background"],highlightthickness=0);self.canvas.pack(fill="both",expand=True)
+  self.bind("<KeyPress>",self.key_down);self.bind("<KeyRelease>",self.key_up);self.bind("<Escape>",lambda _e:self.close());self.bind("<FocusOut>",lambda _e:self.pressed.clear());self.protocol("WM_DELETE_WINDOW",self.close);self.focus_force();self.after(16,self.tick)
+ def close(self):self.closed=True;self.destroy()
+ def key_down(self,event):self.pressed.add(event.keysym.lower())
+ def key_up(self,event):self.pressed.discard(event.keysym.lower())
+ def held(self,name):return bool(self.KEY_GROUPS[name]&self.pressed)
+ def current_animation(self,moving):
+  key=("walk_" if moving else "idle_")+self.facing;assigned=self.project.get("directional_animations",{}).get(key,"") or self.project.get("active_animation","")
+  animation=self.project.get("animations",{}).get(assigned,{})
+  if not animation.get("frames"):
+   partner=("idle_" if moving else "walk_")+self.facing;assigned=self.project.get("directional_animations",{}).get(partner,"") or self.project.get("active_animation","");animation=self.project.get("animations",{}).get(assigned,{})
+  return assigned,animation
+ def photo(self,frame):
+  key=frame["png_base64"]
+  if key not in self.photos:self.photos[key]=tk.PhotoImage(data=key)
+  return self.photos[key]
+ def tick(self):
+  if self.closed or not self.winfo_exists():return
+  dx=int(self.moves["RIGHT"]>0 and self.held("RIGHT"))-int(self.moves["LEFT"]>0 and self.held("LEFT"));dy=int(self.moves["DOWN"]>0 and self.held("DOWN"))-int(self.moves["UP"]>0 and self.held("UP"))
+  speed_x=self.project["player_speed"]*(self.moves["RIGHT"] if dx>0 else self.moves["LEFT"] if dx<0 else 100)/100;speed_y=self.project["player_speed"]*(self.moves["DOWN"] if dy>0 else self.moves["UP"] if dy<0 else 100)/100
+  run_key=self.BUTTON_KEYS.get(self.run_button,"");running=bool(self.run_speed and ({"shift_l","shift_r",run_key}&self.pressed))
+  if running:speed_x*=self.run_speed/100;speed_y*=self.run_speed/100
+  if dx and dy:speed_x*=181/256;speed_y*=181/256
+  self.x=max(0,min(1280-self.project["player_width"],self.x+dx*speed_x));self.y=max(0,min(720-self.project["player_height"],self.y+dy*speed_y))
+  if dy>0:self.facing="down"
+  elif dx<0:self.facing="left"
+  elif dx>0:self.facing="right"
+  elif dy<0:self.facing="up"
+  name,animation=self.current_animation(bool(dx or dy));frames=animation.get("frames",[])
+  if name!=self.last_anim:self.frame=0;self.anim_tick=0;self.last_anim=name
+  if frames:
+   self.anim_tick+=1;delay=max(1,60//max(1,animation.get("fps",8)))
+   if self.anim_tick>=delay:
+    self.anim_tick=0
+    if self.frame+1<len(frames):self.frame+=1
+    elif animation.get("loop",True):self.frame=0
+  self.redraw(frames);self.after(16,self.tick)
+ def redraw(self,frames):
+  self.canvas.delete("all");w=max(1,self.canvas.winfo_width());h=max(1,self.canvas.winfo_height());scale=min(w/1280,h/720);ox=(w-1280*scale)/2;oy=(h-720*scale)/2
+  self.canvas.create_rectangle(ox,oy,ox+1280*scale,oy+720*scale,fill=self.project["background"],outline="#888")
+  x=ox+self.x*scale;y=oy+self.y*scale;pw=self.project["player_width"]*scale;ph=self.project["player_height"]*scale
+  if frames:
+   pic=self.photo(frames[self.frame%len(frames)]);ratio=min(pw/max(1,pic.width()),ph/max(1,pic.height()))
+   if ratio>=1:factor=max(1,int(ratio));shown=pic.zoom(factor,factor)
+   else:factor=max(1,int(max(pic.width()/max(1,pw),pic.height()/max(1,ph))+.999));shown=pic.subsample(factor,factor)
+   self.photos["shown"]=shown;self.canvas.create_image(x,y,image=shown,anchor="nw")
+  else:self.canvas.create_rectangle(x,y,x+pw,y+ph,fill=self.project["player_color"],outline="white")
+  self.canvas.create_text(ox+8,oy+8,text=self.project["title"] or "Untitled",fill="white",anchor="nw")
 
 class Editor(tk.Tk):
  def __init__(self):
@@ -26,7 +179,7 @@ class Editor(tk.Tk):
 
  def build_ui(self):
   bar=ttk.Frame(self,padding=8); bar.pack(fill="x")
-  for label,fn in (("New",self.new),("Open",self.open),("Save",self.save),("Save As",self.save_as),("Export Wii U Project",self.export)):
+  for label,fn in (("New",self.new),("Open",self.open),("Save",self.save),("Save As",self.save_as),("Test Run",self.test_run),("Export Wii U Project",self.export)):
    ttk.Button(bar,text=label,command=fn).pack(side="left",padx=3)
   ttk.Label(bar,text="2D / 2.5D",foreground="#356fa6").pack(side="right",padx=8)
   tabs=ttk.Notebook(self); tabs.pack(fill="both",expand=True,padx=8,pady=(0,8))
@@ -59,7 +212,9 @@ class Editor(tk.Tk):
   self.anim_list=tk.Listbox(left,width=23,height=20,exportselection=False); self.anim_list.pack(fill="both",expand=True); self.anim_list.bind("<<ListboxSelect>>",lambda _e:self.refresh_frames())
   ttk.Button(left,text="New animation",command=self.add_animation).pack(fill="x",pady=(8,2)); ttk.Button(left,text="Delete animation",command=self.delete_animation).pack(fill="x")
   self.frame_list=tk.Listbox(mid,height=20,exportselection=False); self.frame_list.grid(row=0,column=0,columnspan=3,sticky="nsew"); self.frame_list.bind("<<ListboxSelect>>",lambda _e:self.show_frame())
-  ttk.Button(mid,text="Import PNG frame(s)",command=self.import_frames).grid(row=1,column=0,columnspan=3,sticky="ew",pady=(8,2))
+  make=ttk.Frame(mid);make.grid(row=1,column=0,columnspan=3,sticky="ew",pady=(8,2))
+  for column in range(3):make.columnconfigure(column,weight=1)
+  ttk.Button(make,text="New frame",command=self.new_frame).grid(row=0,column=0,sticky="ew");ttk.Button(make,text="Edit selected",command=self.edit_frame).grid(row=0,column=1,sticky="ew",padx=3);ttk.Button(make,text="Import PNG(s)",command=self.import_frames).grid(row=0,column=2,sticky="ew")
   ttk.Button(mid,text="Up",command=lambda:self.move_frame(-1)).grid(row=2,column=0,sticky="ew"); ttk.Button(mid,text="Down",command=lambda:self.move_frame(1)).grid(row=2,column=1,sticky="ew"); ttk.Button(mid,text="Delete",command=self.delete_frame).grid(row=2,column=2,sticky="ew")
   opts=ttk.Frame(right); opts.pack(fill="x"); ttk.Label(opts,text="FPS").pack(side="left")
   self.fps=tk.StringVar(value="8"); ttk.Spinbox(opts,from_=1,to=60,width=6,textvariable=self.fps,command=self.options_changed).pack(side="left",padx=5)
@@ -136,6 +291,43 @@ class Editor(tk.Tk):
     a["frames"].append({"name":Path(path).name,"width":size[0],"height":size[1],"png_base64":data})
    self.photos.clear();self.refresh_frames();self.redraw()
   except Exception as e:messagebox.showerror(APP_NAME,f"Import failed:\n{e}")
+ def new_frame(self):
+  name=self.selected_anim()
+  if not name:messagebox.showinfo(APP_NAME,"Create or select an animation first.");return
+  frames=self.project["animations"][name]["frames"];selected=self.frame_list.curselection()
+  if frames:
+   source_index=selected[0] if selected else len(frames)-1;source=frames[source_index];width,height=source["width"],source["height"];pixels=self.frame_pixels(source);insert_at=source_index+1
+  else:
+   width=simpledialog.askinteger(APP_NAME,"Frame width (1–128 pixels):",parent=self,minvalue=1,maxvalue=128,initialvalue=32)
+   if width is None:return
+   height=simpledialog.askinteger(APP_NAME,"Frame height (1–128 pixels):",parent=self,minvalue=1,maxvalue=128,initialvalue=32)
+   if height is None:return
+   pixels=None;insert_at=0
+  copy_sources=self.frame_copy_sources(frames)
+  editor=PixelFrameEditor(self,width,height,pixels,title=f"Create frame for {name}",copy_sources=copy_sources);self.wait_window(editor)
+  if editor.result:
+   frames.insert(insert_at,{"name":f"drawn_frame_{len(frames)+1:02d}.png","width":width,"height":height,"png_base64":editor.result})
+   self.photos.clear();self.refresh_frames();self.frame_list.selection_clear(0,"end");self.frame_list.selection_set(insert_at);self.show_frame();self.redraw()
+ def frame_pixels(self,frame):
+  pic=self.photo(frame);pixels=[]
+  for y in range(pic.height()):
+   for x in range(pic.width()):
+    if pic.transparency_get(x,y):pixels.append((0,0,0,0));continue
+    value=pic.get(x,y)
+    if isinstance(value,str):value=value.lstrip("#");rgb=tuple(int(value[n:n+2],16) for n in (0,2,4))
+    else:rgb=tuple(value[:3])
+    pixels.append(rgb+(255,))
+  return pixels
+ def frame_copy_sources(self,frames,exclude=None):
+  return [(f"Frame {i+1:02d} - {frame['name']}",self.frame_pixels(frame)) for i,frame in enumerate(frames) if i!=exclude]
+ def edit_frame(self):
+  name=self.selected_anim();selected=self.frame_list.curselection()
+  if not name or not selected:messagebox.showinfo(APP_NAME,"Select a frame to edit first.");return
+  index=selected[0];frame=self.project["animations"][name]["frames"][index];pixels=self.frame_pixels(frame)
+  copy_sources=self.frame_copy_sources(self.project["animations"][name]["frames"],index)
+  editor=PixelFrameEditor(self,frame["width"],frame["height"],pixels,f"Edit {frame['name']}",copy_sources);self.wait_window(editor)
+  if editor.result:
+   frame["png_base64"]=editor.result;self.photos.clear();self.refresh_frames();self.frame_list.selection_set(index);self.show_frame();self.redraw()
  def move_frame(self,d):
   name=self.selected_anim();s=self.frame_list.curselection()
   if not name or not s:return
@@ -196,8 +388,8 @@ class Editor(tk.Tk):
   if not path:return
   try:
    data=json.loads(Path(path).read_text(encoding="utf-8"))
-   if data.get("format") not in ("utopia-project-4","utopia-project-3","utopia-project-2","wugc-project-1"):raise ValueError("Unsupported project format")
-   data["format"]="utopia-project-4";self.project={**fresh(),**data};self.project.setdefault("animations",{});self.project.setdefault("directional_animations",{});self.project.setdefault("blueprint",default_graph());self.project_path=Path(path);self.load_project();self.status.set(f"Opened {Path(path).name}")
+   if data.get("format") not in ("utopia-project-5","utopia-project-4","utopia-project-3","utopia-project-2","wugc-project-1"):raise ValueError("Unsupported project format")
+   data["format"]="utopia-project-5";self.project={**fresh(),**data};self.project.setdefault("animations",{});self.project.setdefault("directional_animations",{});self.project.setdefault("blueprint",default_graph());self.project_path=Path(path);self.load_project();self.status.set(f"Opened {Path(path).name}")
   except Exception as e:messagebox.showerror(APP_NAME,f"Open failed:\n{e}")
  def save(self):
   if self.project_path is None:return self.save_as()
@@ -206,6 +398,8 @@ class Editor(tk.Tk):
   path=filedialog.asksaveasfilename(defaultextension=".ugs",filetypes=[("Utopia project","*.ugs")])
   if not path:return False
   self.project_path=Path(path);return self.save()
+ def test_run(self):
+  self.fields_changed();TestRunner(self,self.project,self.blueprint.movement_config());self.status.set("Test Run started")
 
  def write_frames(self,out):
   lines=["#pragma once","#include <stdint.h>","typedef struct { const uint32_t *const *frames; unsigned int count, width, height, delay, loop; } UtopiaAnimation;"]
