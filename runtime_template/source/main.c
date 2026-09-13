@@ -4,6 +4,28 @@
 #include "animation_frames.h"
 #include "blueprint_logic.h"
 #include "renderer.h"
+#include "room_data.h"
+
+static int room_blocked(int x, int y) {
+    const int points[4][2] = {{x,y},{x+PLAYER_W-1,y},{x,y+PLAYER_H-1},{x+PLAYER_W-1,y+PLAYER_H-1}};
+    for (int i=0;i<4;++i) {
+        int cx=points[i][0]/TILE_SIZE, cy=points[i][1]/TILE_SIZE;
+        if (cx>=0 && cx<ROOM_COLS && cy>=0 && cy<ROOM_ROWS) {
+            uint8_t t=ROOM_MAP[cy*ROOM_COLS+cx];
+            if (t!=255 && t<TILE_COUNT && ROOM_SOLID[t]) return 1;
+        }
+    }
+    return 0;
+}
+
+static void draw_room(void) {
+    for (int gy=0; gy<ROOM_ROWS; ++gy)
+        for (int gx=0; gx<ROOM_COLS; ++gx) {
+            uint8_t t=ROOM_MAP[gy*ROOM_COLS+gx];
+            if (t!=255 && t<TILE_COUNT)
+                UtopiaRendererDrawSprite(gx*TILE_SIZE, gy*TILE_SIZE, TILE_SIZE, TILE_SIZE, ROOM_TILES[t], TILE_SIZE, TILE_SIZE);
+        }
+}
 
 int main(int argc, char **argv)
 {
@@ -48,8 +70,10 @@ int main(int argc, char **argv)
         if (move_x && move_y) { speed_x = speed_x * 181 / 256; speed_y = speed_y * 181 / 256; }
         if (speed_x < 1) speed_x = 1;
         if (speed_y < 1) speed_y = 1;
-        x += move_x * speed_x;
-        y += move_y * speed_y;
+        int next_x = x + move_x * speed_x;
+        int next_y = y + move_y * speed_y;
+        if (!room_blocked(next_x, y)) x = next_x;
+        if (!room_blocked(x, next_y)) y = next_y;
         if (move_y > 0) facing = 0;
         else if (move_x < 0) facing = 1;
         else if (move_x > 0) facing = 2;
@@ -60,6 +84,7 @@ int main(int argc, char **argv)
         if (y > 720 - PLAYER_H) y = 720 - PLAYER_H;
 
         UtopiaRendererBegin(BACKGROUND_COLOR);
+        draw_room();
 #if HAS_ANIMATION
         const UtopiaAnimation *idle[] = {&ANIM_IDLE_DOWN, &ANIM_IDLE_LEFT, &ANIM_IDLE_RIGHT, &ANIM_IDLE_UP};
         const UtopiaAnimation *walk[] = {&ANIM_WALK_DOWN, &ANIM_WALK_LEFT, &ANIM_WALK_RIGHT, &ANIM_WALK_UP};
