@@ -1,4 +1,4 @@
-# Utopia Game Studio 0.95
+# Utopia Game Studio 0.95.01
 
 Utopia Game Studio is an independent visual creator for native Wii U homebrew games. Its first complete framework is focused on **2D and 2.5D RPGs**, with other genres planned later.
 
@@ -66,7 +66,14 @@ Version 0.95 expands Blueprint logic into a reusable runtime variable system.
 
 Example: create `WalkSpeed = 100`, select `WalkSpeed` as the speed source on a Move Character node, then connect another button to **Set Variable** or **Change Variable** to modify movement speed while the game is running.
 
-Versioned export folders now use `utopia_wiiu_export_v0_95`. Small follow-up builds may use three-part versions such as `0.95.1`, `0.95.2`, and so on.
+Version 0.95.01 makes Blueprint link deletion safer:
+
+- The dangerous **Clear Links** button has been removed completely.
+- Click a single connection line to select it; the selected link is highlighted.
+- Use **Delete Link** to remove only that selected connection.
+- A confirmation dialog identifies the source and destination node before deletion.
+
+Versioned export folders include the complete editor version, so this build exports to `utopia_wiiu_export_v0_95_01`. Version numbers may continue into additional sub-levels when useful.
 
 ## Native Wii U GX2 renderer
 
@@ -142,11 +149,11 @@ Removing one of those links disables that direction in the exported game. Start,
 2. Double-click `run_editor.bat`.
 3. Save a `.ugs` project and choose **Export Wii U Project**.
 4. Install devkitPro and `wiiu-dev` from https://devkitpro.org/wiki/Getting_Started.
-5. In the devkitPro MSYS2 terminal, enter the versioned exported `utopia_wiiu_export_v0_95` directory and run `make`.
+5. In the devkitPro MSYS2 terminal, enter the versioned exported `utopia_wiiu_export_v0_95_01` directory and run `make`.
 6. Copy `game.wuhb` to `wiiu/apps/utopia_test/game.wuhb` on the Aroma SD card.
 
-## Version 0.95 test
+## Version 0.95.01 test
 
-Create a variable such as `WalkSpeed = 100`, assign it as the speed source for the four Move Character nodes, then connect a GamePad button to **Set Variable** or **Change Variable**. In Test Run, confirm the button changes movement speed immediately. Also test a **Compare Variable** between an input and a movement/action node to confirm the action is allowed only when the comparison is true. Then export `utopia_wiiu_export_v0_95` and repeat the same test in Cemu or on Wii U hardware when available.
+Create a variable such as `WalkSpeed = 100`, assign it as the speed source for the four Move Character nodes, then connect a GamePad button to **Set Variable** or **Change Variable**. In Test Run, confirm the button changes movement speed immediately. Also test a **Compare Variable** between an input and a movement/action node to confirm the action is allowed only when the comparison is true. Then select one Blueprint connection line and confirm **Delete Link** removes only that connection. Export `utopia_wiiu_export_v0_95_01` and repeat the runtime test in Cemu or on Wii U hardware when available.
 
 Utopia Game Studio is not affiliated with or endorsed by Nintendo, Epic Games, or YoYo Games.
