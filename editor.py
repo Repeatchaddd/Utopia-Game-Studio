@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""Utopia Game Studio 0.95.02 - RPG-focused 2D/2.5D Wii U homebrew editor."""
+"""Utopia Game Studio v1.95.001.000 - 2D/2.5D Wii U game creator."""
 import base64, json, shutil, struct, zlib
 from pathlib import Path
 import tkinter as tk
 from tkinter import colorchooser, filedialog, messagebox, simpledialog, ttk
-from blueprint_editor import BlueprintPanel, default_graph
+from blueprint_editor import BlueprintPanel, default_graph\nfrom game_framework import FrameworkPanel, GameRuntime, default_framework, ensure_framework
 
-APP_NAME, VERSION = "Utopia Game Studio", "0.95.02"
+APP_NAME, VERSION = "Utopia Game Studio", "1.95.001.000"
 ROOT = Path(__file__).resolve().parent
 TEMPLATE = ROOT / "runtime_template"
 ANIMATION_STATES=("idle_down","idle_left","idle_right","idle_up","walk_down","walk_left","walk_right","walk_up")
-DEFAULT = {"format":"utopia-project-7","title":"My Utopia RPG","author":"Homebrew Developer",
+DEFAULT = {"format":"utopia-project-8","title":"My Utopia RPG","author":"Homebrew Developer",
  "game_style":"2D / 2.5D RPG","background":"#18365c","player_color":"#f4d35e",
  "player_x":560,"player_y":320,"player_width":80,"player_height":80,"player_speed":6,
  "animations":{},"active_animation":"","directional_animations":{key:"" for key in ANIMATION_STATES},"blueprint":default_graph(),
- "tiles":[],"room_map":[-1]*(40*23),"variables":[]}
+ "tiles":[],"room_map":[-1]*(40*23),"variables":[],"framework":default_framework()}
 
 def fresh(): return json.loads(json.dumps(DEFAULT))
 def rgba(value): return "0x" + value.lstrip("#").upper() + "FFu"
@@ -121,7 +121,7 @@ class TestRunner(tk.Toplevel):
  BUTTON_KEYS={"A":"z","B":"x","X":"c","Y":"v"}
  def __init__(self,parent,project,movement):
   super().__init__(parent);self.title(f"{APP_NAME} Test Run");self.geometry("960x600");self.minsize(640,400);self.project=json.loads(json.dumps(project));self.bp=movement
-  self.bp_vars=dict(self.bp.get("variables",{}));self.first_tick=True
+  self.bp_vars=dict(self.bp.get("variables",{}));self.game=GameRuntime(self.project,self.bp_vars);self.first_tick=True
   self.pressed=set();self.x=float(self.project["player_x"]);self.y=float(self.project["player_y"]);self.facing="down";self.frame=0;self.anim_tick=0;self.last_anim=None;self.photos={};self.closed=False
   info=ttk.Frame(self,padding=6);info.pack(fill="x");ttk.Label(info,text="Move: Arrow keys or WASD   •   Wii U A=Z, B=X, X=C, Y=V   •   Shift also tests connected Run Modifier nodes   •   Esc: Stop",anchor="center").pack(fill="x")
   self.canvas=tk.Canvas(self,background=self.project["background"],highlightthickness=0);self.canvas.pack(fill="both",expand=True)
@@ -198,7 +198,7 @@ class TestRunner(tk.Toplevel):
   elif dx<0:self.facing="left"
   elif dx>0:self.facing="right"
   elif dy<0:self.facing="up"
-  name,animation=self.current_animation(bool(dx or dy));frames=animation.get("frames",[])
+  self.game.step(self,first)\n  name,animation=self.current_animation(bool(dx or dy));frames=animation.get("frames",[])
   if name!=self.last_anim:self.frame=0;self.anim_tick=0;self.last_anim=name
   if frames:
    self.anim_tick+=1;delay=max(1,60//max(1,animation.get("fps",8)))
@@ -208,7 +208,7 @@ class TestRunner(tk.Toplevel):
     elif animation.get("loop",True):self.frame=0
   self.redraw(frames);self.after(16,self.tick)
  def blocked(self,x,y):
-  tw=32;tiles=self.project.get("tiles",[]);room=self.project.get("room_map",[])
+  tw=32;tiles=self.project.get("tiles",[]);room=self.game.room_map()
   points=((x,y),(x+self.project["player_width"]-1,y),(x,y+self.project["player_height"]-1),(x+self.project["player_width"]-1,y+self.project["player_height"]-1))
   for px,py in points:
    cx,cy=int(px)//tw,int(py)//tw
@@ -219,7 +219,7 @@ class TestRunner(tk.Toplevel):
  def redraw(self,frames):
   self.canvas.delete("all");w=max(1,self.canvas.winfo_width());h=max(1,self.canvas.winfo_height());scale=min(w/1280,h/720);ox=(w-1280*scale)/2;oy=(h-720*scale)/2
   self.canvas.create_rectangle(ox,oy,ox+1280*scale,oy+720*scale,fill=self.project["background"],outline="#888")
-  tiles=self.project.get("tiles",[]);room=self.project.get("room_map",[])
+  tiles=self.project.get("tiles",[]);room=self.game.room_map()
   for gy in range(23):
    for gx in range(40):
     pos=gy*40+gx;i=room[pos] if pos<len(room) else -1
@@ -229,7 +229,7 @@ class TestRunner(tk.Toplevel):
      pic=self.photos[key];factor=max(1,int(32*scale)//32);shown=pic.zoom(factor,factor) if factor>1 else pic
      if factor>1:self.photos[key+":shown"]=shown
      self.canvas.create_image(ox+gx*32*scale,oy+gy*32*scale,image=shown,anchor="nw")
-  x=ox+self.x*scale;y=oy+self.y*scale;pw=self.project["player_width"]*scale;ph=self.project["player_height"]*scale
+  self.game.draw(self.canvas,scale,ox,oy)\n  x=ox+self.x*scale;y=oy+self.y*scale;pw=self.project["player_width"]*scale;ph=self.project["player_height"]*scale
   if frames:
    pic=self.photo(frames[self.frame%len(frames)]);ratio=min(pw/max(1,pic.width()),ph/max(1,pic.height()))
    if ratio>=1:factor=max(1,int(ratio));shown=pic.zoom(factor,factor)
@@ -251,9 +251,9 @@ class Editor(tk.Tk):
   ttk.Label(bar,text="2D / 2.5D",foreground="#356fa6").pack(side="right",padx=8)
   tabs=ttk.Notebook(self); tabs.pack(fill="both",expand=True,padx=8,pady=(0,8))
   self.status=tk.StringVar(value="Ready"); ttk.Label(self,textvariable=self.status,relief="sunken",anchor="w",padding=4).pack(fill="x")
-  scene=ttk.Frame(tabs,padding=8); room=ttk.Frame(tabs,padding=8); anim=ttk.Frame(tabs,padding=8); logic=ttk.Frame(tabs)
-  tabs.add(scene,text="Scene");tabs.add(room,text="Room / Tiles");tabs.add(anim,text="Animated Character");tabs.add(logic,text="Blueprint Logic")
-  self.build_scene(scene);self.build_room(room);self.build_anim(anim);self.blueprint=BlueprintPanel(logic,lambda:self.project,self.status);self.blueprint.pack(fill="both",expand=True)
+  scene=ttk.Frame(tabs,padding=8); room=ttk.Frame(tabs,padding=8); anim=ttk.Frame(tabs,padding=8); framework=ttk.Frame(tabs); logic=ttk.Frame(tabs)
+  tabs.add(scene,text="Scene");tabs.add(room,text="Room / Tiles");tabs.add(anim,text="Animated Character");tabs.add(framework,text="Game Framework");tabs.add(logic,text="Blueprint Logic")
+  self.build_scene(scene);self.build_room(room);self.build_anim(anim);self.framework=FrameworkPanel(framework,lambda:self.project,self.status,self.redraw);self.framework.pack(fill="both",expand=True);self.blueprint=BlueprintPanel(logic,lambda:self.project,self.status);self.blueprint.pack(fill="both",expand=True)
 
  def build_scene(self,parent):
   body=ttk.Panedwindow(parent,orient="horizontal"); body.pack(fill="both",expand=True)
@@ -398,10 +398,10 @@ class Editor(tk.Tk):
  def load_project(self):
   for k,v in self.vars.items():v.set(str(self.project[k]))
   self.project.setdefault("directional_animations",{})
-  self.project.setdefault("tiles",[]);self.project.setdefault("room_map",[-1]*(40*23));self.project.setdefault("variables",[])
+  self.project.setdefault("tiles",[]);self.project.setdefault("room_map",[-1]*(40*23));self.project.setdefault("variables",[]);ensure_framework(self.project)
   if len(self.project["room_map"])<40*23:self.project["room_map"]=(self.project["room_map"]+[-1]*(40*23))[:40*23]
   for key in ANIMATION_STATES:self.project["directional_animations"].setdefault(key,"")
-  self.photos.clear();self.refresh_animations();self.refresh_tiles();self.blueprint.refresh();self.redraw()
+  self.photos.clear();self.refresh_animations();self.refresh_tiles();self.framework.refresh();self.blueprint.refresh();self.redraw()
  def fields_changed(self):
   for k in ("title","author"):self.project[k]=self.vars[k].get()
   for k in ("player_x","player_y","player_width","player_height","player_speed"):
@@ -549,8 +549,8 @@ class Editor(tk.Tk):
   if not path:return
   try:
    data=json.loads(Path(path).read_text(encoding="utf-8"))
-   if data.get("format") not in ("utopia-project-7","utopia-project-6","utopia-project-5","utopia-project-4","utopia-project-3","utopia-project-2","wugc-project-1"):raise ValueError("Unsupported project format")
-   data["format"]="utopia-project-7";self.project={**fresh(),**data};self.project.setdefault("animations",{});self.project.setdefault("directional_animations",{});self.project.setdefault("blueprint",default_graph());self.project.setdefault("tiles",[]);self.project.setdefault("room_map",[-1]*(40*23));self.project.setdefault("variables",[]);self.project_path=Path(path);self.load_project();self.status.set(f"Opened {Path(path).name}")
+   if data.get("format") not in ("utopia-project-8","utopia-project-7","utopia-project-6","utopia-project-5","utopia-project-4","utopia-project-3","utopia-project-2","wugc-project-1"):raise ValueError("Unsupported project format")
+   data["format"]="utopia-project-8";self.project={**fresh(),**data};self.project.setdefault("animations",{});self.project.setdefault("directional_animations",{});self.project.setdefault("blueprint",default_graph());self.project.setdefault("tiles",[]);self.project.setdefault("room_map",[-1]*(40*23));self.project.setdefault("variables",[]);ensure_framework(self.project);self.project_path=Path(path);self.load_project();self.status.set(f"Opened {Path(path).name}")
   except Exception as e:messagebox.showerror(APP_NAME,f"Open failed:\n{e}")
  def save(self):
   if self.project_path is None:return self.save_as()
