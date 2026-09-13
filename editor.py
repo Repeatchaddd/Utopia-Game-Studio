@@ -1,16 +1,35 @@
 #!/usr/bin/env python3
-"""Utopia Game Studio v1.95.001.002 - 2D/2.5D Wii U game creator."""
+"""Utopia Game Studio v1.95.001.003 - 2D/2.5D Wii U game creator."""
 import base64, json, shutil, struct, zlib
 from pathlib import Path
 import tkinter as tk
 from tkinter import colorchooser, filedialog, messagebox, simpledialog, ttk
 from blueprint_editor import BlueprintPanel, default_graph
 from game_framework import FrameworkPanel, GameRuntime, default_framework, ensure_framework
+from splash_part1 import SPLASH_PART_1
+from splash_part2 import SPLASH_PART_2
 
-APP_NAME, VERSION = "Utopia Game Studio", "1.95.001.002"
+APP_NAME, VERSION = "Utopia Game Studio", "1.95.001.003"
 ROOT = Path(__file__).resolve().parent
 TEMPLATE = ROOT / "runtime_template"
 ANIMATION_STATES=("idle_down","idle_left","idle_right","idle_up","walk_down","walk_left","walk_right","walk_up")
+
+def show_splash(duration_ms=1800):
+ """Display the embedded Utopia editor splash before the main window opens."""
+ splash=tk.Tk();splash.overrideredirect(True);splash.configure(background="black")
+ try:
+  source=tk.PhotoImage(data=SPLASH_PART_1+SPLASH_PART_2);shown=source.zoom(2,2)
+  splash._source_image=source;splash._shown_image=shown
+  tk.Label(splash,image=shown,borderwidth=0,highlightthickness=0).pack()
+  splash.update_idletasks();width,height=shown.width(),shown.height()
+  x=max(0,(splash.winfo_screenwidth()-width)//2);y=max(0,(splash.winfo_screenheight()-height)//2)
+  splash.geometry(f"{width}x{height}+{x}+{y}");splash.lift()
+  try:splash.attributes("-topmost",True)
+  except tk.TclError:pass
+  splash.after(150,lambda:splash.attributes("-topmost",False))
+  splash.after(duration_ms,splash.destroy);splash.mainloop()
+ except tk.TclError:
+  splash.destroy()
 DEFAULT = {"format":"utopia-project-8","title":"My Utopia RPG","author":"Homebrew Developer",
  "game_style":"2D / 2.5D RPG","background":"#18365c","player_color":"#f4d35e",
  "player_x":560,"player_y":320,"player_width":80,"player_height":80,"player_speed":6,
@@ -636,4 +655,6 @@ class Editor(tk.Tk):
    self.status.set(f"Exported v{VERSION} to {out}");messagebox.showinfo(APP_NAME,f"Exported Utopia Game Studio v{VERSION} project to:\n{out}\n\nBuild with: make")
   except Exception as e:messagebox.showerror(APP_NAME,f"Export failed:\n{e}")
 
-if __name__=="__main__":Editor().mainloop()
+if __name__=="__main__":
+ show_splash()
+ Editor().mainloop()
