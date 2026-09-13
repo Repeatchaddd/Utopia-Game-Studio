@@ -45,6 +45,10 @@ static GX2Sampler sampler = {};
 static bool textureReady = false;
 static unsigned int currentWidth = 0, currentHeight = 0;
 static const uint32_t *currentPixels = nullptr;
+static uint32_t frameBackground = 0;
+typedef struct { int x,y,w,h; const uint32_t *pixels; unsigned int tw,th; } DrawCommand;
+static DrawCommand commands[128];
+static unsigned int commandCount = 0;
 
 static const float texCoords[8] = {
     0.0f, 1.0f,
@@ -172,6 +176,8 @@ static void colorFloats(uint32_t c, float *r, float *g, float *b, float *a) {
 void UtopiaRendererBegin(uint32_t background_rgba) {
     float r,g,b,a;
     colorFloats(background_rgba,&r,&g,&b,&a);
+    frameBackground = background_rgba;
+    commandCount = 0;
     WHBGfxBeginRender();
     WHBGfxBeginRenderTV();
     WHBGfxClearColor(r,g,b,a);
@@ -179,6 +185,7 @@ void UtopiaRendererBegin(uint32_t background_rgba) {
 
 void UtopiaRendererDrawSprite(int x, int y, int w, int h, const uint32_t *pixels,
                               unsigned int texture_width, unsigned int texture_height) {
+    if (commandCount < 128) commands[commandCount++] = (DrawCommand){x,y,w,h,pixels,texture_width,texture_height};
     if (!uploadTexture(pixels, texture_width, texture_height)) return;
     setQuad(x,y,w,h);
     bindAndDraw();
@@ -194,11 +201,17 @@ void UtopiaRendererDrawSolid(int x, int y, int w, int h, uint32_t rgba) {
 void UtopiaRendererEnd(void) {
     WHBGfxFinishRenderTV();
 
+    float r,g,b,a;
+    colorFloats(frameBackground,&r,&g,&b,&a);
     WHBGfxBeginRenderDRC();
-    /* DRC gets its own draw pass so TV and GamePad are both GPU rendered. */
-    GX2ColorBuffer *drc = WHBGfxGetDRCColourBuffer();
-    (void)drc;
-    /* Clear color is already represented by the TV pass' logical scene; caller redraws sprite below. */
+    WHBGfxClearColor(r,g,b,a);
+    currentPixels = nullptr;
+    for (unsigned int i = 0; i < commandCount; ++i) {
+        DrawCommand *cmd = &commands[i];
+        if (!uploadTexture(cmd->pixels, cmd->tw, cmd->th)) continue;
+        setQuad(cmd->x,cmd->y,cmd->w,cmd->h);
+        bindAndDraw();
+    }
     WHBGfxFinishRenderDRC();
     WHBGfxFinishRender();
 }
