@@ -129,7 +129,7 @@ def default_graph():
 
 class BlueprintPanel(ttk.Frame):
  def __init__(self,parent,project_getter,status):
-  super().__init__(parent);self.get_project=project_getter;self.status=status;self.selected=None;self.link_from=None;self.drag=None
+  super().__init__(parent);self.get_project=project_getter;self.status=status;self.selected=None;self.selected_link=None;self.link_from=None;self.drag=None
   tools=ttk.Frame(self,padding=6);tools.pack(fill="x")
   self.kind=tk.StringVar(value="GamePad Input");ttk.Combobox(tools,textvariable=self.kind,state="readonly",values=list(NODE_COLORS),width=18).pack(side="left")
   ttk.Button(tools,text="Add Node",command=self.add_node).pack(side="left",padx=4)
@@ -137,7 +137,7 @@ class BlueprintPanel(ttk.Frame):
   ttk.Button(tools,text="Connect",command=self.begin_link).pack(side="left",padx=4)
   ttk.Button(tools,text="Edit Properties",command=self.edit_node).pack(side="left",padx=4)
   ttk.Button(tools,text="Delete",command=self.delete_node).pack(side="left",padx=4)
-  ttk.Button(tools,text="Clear Links",command=self.clear_links).pack(side="left",padx=4)
+  ttk.Button(tools,text="Delete Link",command=self.delete_link).pack(side="left",padx=4)
   self.canvas=tk.Canvas(self,background="#20242b",scrollregion=(0,0,1900,1200),highlightthickness=0)
   xs=ttk.Scrollbar(self,orient="horizontal",command=self.canvas.xview);ys=ttk.Scrollbar(self,orient="vertical",command=self.canvas.yview)
   self.canvas.configure(xscrollcommand=xs.set,yscrollcommand=ys.set);self.canvas.pack(fill="both",expand=True,side="left");ys.pack(fill="y",side="right");xs.pack(fill="x",side="bottom")
@@ -148,9 +148,10 @@ class BlueprintPanel(ttk.Frame):
  def manage_variables(self):VariableManager(self,self.get_project());self.refresh()
  def refresh(self):
   self.canvas.delete("all");g=self.graph();lookup={n["id"]:n for n in g["nodes"]}
-  for link in g["links"]:
+  for i,link in enumerate(g["links"]):
    a,b=lookup.get(link["from"]),lookup.get(link["to"])
-   if a and b:self.canvas.create_line(a["x"]+190,a["y"]+40,b["x"],b["y"]+40,fill="#e7b74f",width=3,smooth=True,arrow="last")
+   if a and b:
+    selected=i==self.selected_link;self.canvas.create_line(a["x"]+190,a["y"]+40,b["x"],b["y"]+40,fill="#ff6b6b" if selected else "#e7b74f",width=5 if selected else 3,smooth=True,arrow="last",tags=(f"link_{i}","link"))
   for n in g["nodes"]:self.draw_node(n)
  def draw_node(self,n):
   x,y=n["x"],n["y"];tag=f"node_{n['id']}";outline="#ffffff" if n["id"]==self.selected else "#101216"
@@ -173,9 +174,19 @@ class BlueprintPanel(ttk.Frame):
    for tag in self.canvas.gettags(item):
     if tag.startswith("node_"):return int(tag[5:])
   return None
+ def event_link(self,e):
+  x,y=self.canvas.canvasx(e.x),self.canvas.canvasy(e.y);items=self.canvas.find_overlapping(x-5,y-5,x+5,y+5)
+  for item in reversed(items):
+   for tag in self.canvas.gettags(item):
+    if tag.startswith("link_"):return int(tag[5:])
+  return None
  def click(self,e):
   ident=self.event_node(e)
-  if ident is None:self.selected=None;self.refresh();return
+  if ident is None:
+   link=self.event_link(e);self.selected=None;self.selected_link=link;self.drag=None
+   if link is not None:self.status.set("Blueprint link selected - use Delete Link to remove only this connection")
+   self.refresh();return
+  self.selected_link=None
   if self.link_from is not None and ident!=self.link_from:
    link={"from":self.link_from,"to":ident}
    if link not in self.graph()["links"]:self.graph()["links"].append(link)
@@ -218,9 +229,15 @@ class BlueprintPanel(ttk.Frame):
   self.refresh()
  def delete_node(self):
   if self.selected is None:return
-  g=self.graph();g["nodes"]=[n for n in g["nodes"] if n["id"]!=self.selected];g["links"]=[x for x in g["links"] if self.selected not in (x["from"],x["to"])];self.selected=None;self.refresh()
- def clear_links(self):
-  if messagebox.askyesno("Utopia Game Studio","Remove every blueprint connection?"):self.graph()["links"]=[];self.refresh()
+  g=self.graph();g["nodes"]=[n for n in g["nodes"] if n["id"]!=self.selected];g["links"]=[x for x in g["links"] if self.selected not in (x["from"],x["to"])];self.selected=None;self.selected_link=None;self.refresh()
+ def delete_link(self):
+  g=self.graph()
+  if self.selected_link is None or not (0<=self.selected_link<len(g["links"])):
+   messagebox.showinfo("Utopia Game Studio","Click a connection line first, then choose Delete Link.");return
+  link=g["links"][self.selected_link]
+  if messagebox.askyesno("Utopia Game Studio",f"Remove only this connection?\n\nNode {link['from']} → Node {link['to']}"):
+   del g["links"][self.selected_link];self.status.set("One Blueprint link removed")
+  self.selected_link=None;self.refresh()
  def compiled_config(self):
   p=self.get_project();g=self.graph();lookup={n["id"]:n for n in g["nodes"]};outs={}
   for l in g["links"]:outs.setdefault(l["from"],[]).append(l["to"])
