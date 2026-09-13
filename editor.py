@@ -10,7 +10,7 @@ APP_NAME, VERSION = "Utopia Game Studio", "0.9"
 ROOT = Path(__file__).resolve().parent
 TEMPLATE = ROOT / "runtime_template"
 ANIMATION_STATES=("idle_down","idle_left","idle_right","idle_up","walk_down","walk_left","walk_right","walk_up")
-DEFAULT = {"format":"utopia-project-5","title":"My Utopia RPG","author":"Homebrew Developer",
+DEFAULT = {"format":"utopia-project-6","title":"My Utopia RPG","author":"Homebrew Developer",
  "game_style":"2D / 2.5D RPG","background":"#18365c","player_color":"#f4d35e",
  "player_x":560,"player_y":320,"player_width":80,"player_height":80,"player_speed":6,
  "animations":{},"active_animation":"","directional_animations":{key:"" for key in ANIMATION_STATES},"blueprint":default_graph(),
@@ -260,6 +260,7 @@ class Editor(tk.Tk):
   paths=filedialog.askopenfilenames(filetypes=[("PNG images","*.png")])
   try:
    for path in paths:
+    if len(self.project["tiles"])>=255:raise ValueError("A room supports a maximum of 255 tile definitions.")
     data=base64.b64encode(Path(path).read_bytes()).decode("ascii");pic=tk.PhotoImage(data=data)
     if (pic.width(),pic.height())!=(32,32):raise ValueError(f"{Path(path).name} must be exactly 32×32")
     self.project["tiles"].append({"name":Path(path).name,"png_base64":data,"solid":False})
@@ -503,8 +504,8 @@ class Editor(tk.Tk):
   if not path:return
   try:
    data=json.loads(Path(path).read_text(encoding="utf-8"))
-   if data.get("format") not in ("utopia-project-5","utopia-project-4","utopia-project-3","utopia-project-2","wugc-project-1"):raise ValueError("Unsupported project format")
-   data["format"]="utopia-project-5";self.project={**fresh(),**data};self.project.setdefault("animations",{});self.project.setdefault("directional_animations",{});self.project.setdefault("blueprint",default_graph());self.project.setdefault("tiles",[]);self.project.setdefault("room_map",[-1]*(40*23));self.project_path=Path(path);self.load_project();self.status.set(f"Opened {Path(path).name}")
+   if data.get("format") not in ("utopia-project-6","utopia-project-5","utopia-project-4","utopia-project-3","utopia-project-2","wugc-project-1"):raise ValueError("Unsupported project format")
+   data["format"]="utopia-project-6";self.project={**fresh(),**data};self.project.setdefault("animations",{});self.project.setdefault("directional_animations",{});self.project.setdefault("blueprint",default_graph());self.project.setdefault("tiles",[]);self.project.setdefault("room_map",[-1]*(40*23));self.project_path=Path(path);self.load_project();self.status.set(f"Opened {Path(path).name}")
   except Exception as e:messagebox.showerror(APP_NAME,f"Open failed:\n{e}")
  def save(self):
   if self.project_path is None:return self.save_as()
@@ -575,7 +576,7 @@ class Editor(tk.Tk):
  def export(self):
   folder=filedialog.askdirectory(title="Choose export destination")
   if not folder:return
-  out=Path(folder)/"utopia_wiiu_export"
+  out=Path(folder)/"utopia_wiiu_export_v0_9"
   try:
    if out.exists():
     if not messagebox.askyesno(APP_NAME,f"Replace existing export folder?\n{out}"):return
