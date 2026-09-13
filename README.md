@@ -1,9 +1,15 @@
-# Utopia Game Studio v1.95.001.001
+# v1.95.001.002 startup splash
+
+- Uses the approved existing Utopia splash artwork as the application startup splash.
+- The packaged build includes the image as `splash.png`.
+- The splash displays briefly before the main editor opens.
+
+# Utopia Game Studio v1.95.001.002
 
 **Current development stage:** 1.95  
-**Build:** 1.95.001.001
+**Build:** 1.95.001.002
 
-## v1.95.001.001 — Game Creator Skeleton
+## v1.95.001.002 — Game Creator Skeleton
 
 This release establishes Utopia as a simple general-purpose 2D/2.5D game creator rather than only a movement/animation editor.
 
@@ -21,7 +27,7 @@ New framework capabilities:
 
 The Game Framework tab is the first skeleton layer. More node types, visual instance placement, object animation assignment, richer conditions, and Wii U runtime parity will be expanded through later 1.95.xxx.xxx builds.
 
-## v1.95.001.001 startup fix
+## v1.95.001.002 startup fix
 
 - Corrected the packaged Python 3.14 startup issue where `tk.BooleanVar(False)` treated `False` as the Tk master argument.
 - Packaged build now uses `tk.BooleanVar(value=False)`.
