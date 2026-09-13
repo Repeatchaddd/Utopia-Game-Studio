@@ -1,4 +1,4 @@
-# Utopia Game Studio 0.75
+# Utopia Game Studio 0.8
 
 Utopia Game Studio is an independent visual creator for native Wii U homebrew games. Its first complete framework is focused on **2D and 2.5D RPGs**, with other genres planned later.
 
@@ -49,6 +49,20 @@ Version 0.72 improves Blueprint movement speed control:
 - Holding the connected run button changes actual exported Wii U movement speed; diagonal normalization still applies.
 - Older Blueprint projects default existing movement nodes to 100% speed.
 
+## Native Wii U GX2 renderer
+
+Version 0.8 replaces the original CPU pixel-plotting runtime with a native Wii U **GX2/WHBGfx GPU renderer**.
+
+- TV and Wii U GamePad are rendered as separate GPU targets from the same 1280×720 logical scene.
+- Character animation frames are uploaded as GX2 RGBA textures and drawn as textured quads instead of thousands of `OSScreenPutPixelEx` calls.
+- Point filtering preserves crisp pixel-art edges.
+- Transparent animation pixels are discarded by the pixel shader.
+- Rendering is synchronized to the display swap interval.
+- The renderer is isolated in `renderer.cpp/.h`, giving Utopia a proper rendering layer for later tile maps, backgrounds, objects, effects, camera work, and 2.5D features.
+- The old OSScreen CPU renderer has been removed from the exported runtime.
+
+The current development renderer uses **CafeGLSL** to compile Utopia's small built-in vertex and pixel shaders on the Wii U. Place `glslcompiler.rpl` in `wiiu/libs/` on the SD card. The renderer reports initialization failure rather than silently falling back to the old CPU renderer.
+
 ## Test Run
 
 Version 0.75 adds **Test Run** to the main toolbar. It opens a resizable desktop preview that uses the current project and Blueprint movement setup without requiring a Wii U export.
@@ -97,8 +111,8 @@ Removing one of those links disables that direction in the exported game. Start,
 5. In the devkitPro MSYS2 terminal, enter the exported `utopia_wiiu_export` directory and run `make`.
 6. Copy `game.wuhb` to `wiiu/apps/utopia_test/game.wuhb` on the Aroma SD card.
 
-## Version 0.75 test
+## Version 0.8 test
 
-Choose **Test Run**, move with both WASD and the arrow keys, and hold Shift or the mapped run key to compare walking and running speeds. Confirm disabled Blueprint directions do not move, diagonal movement is normalized, directional animations change correctly, and the character stays inside the scene.
+First verify **Test Run** as before. Then export and build the Wii U project, install `glslcompiler.rpl` in `wiiu/libs/`, and test on Wii U hardware. Confirm the same scene appears on TV and GamePad, animation remains crisp and transparent, movement/Run Modifier behavior is unchanged, and rendering stays smooth while moving and animating.
 
 Utopia Game Studio is not affiliated with or endorsed by Nintendo, Epic Games, or YoYo Games.
