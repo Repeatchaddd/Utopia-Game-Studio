@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Utopia Game Studio 0.75 - RPG-focused 2D/2.5D Wii U homebrew editor."""
+"""Utopia Game Studio 0.8 - RPG-focused 2D/2.5D Wii U homebrew editor."""
 import base64, json, shutil, struct, zlib
 from pathlib import Path
 import tkinter as tk
 from tkinter import colorchooser, filedialog, messagebox, simpledialog, ttk
 from blueprint_editor import BlueprintPanel, default_graph
 
-APP_NAME, VERSION = "Utopia Game Studio", "0.75"
+APP_NAME, VERSION = "Utopia Game Studio", "0.8"
 ROOT = Path(__file__).resolve().parent
 TEMPLATE = ROOT / "runtime_template"
 ANIMATION_STATES=("idle_down","idle_left","idle_right","idle_up","walk_down","walk_left","walk_right","walk_up")
