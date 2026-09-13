@@ -47,7 +47,7 @@ static unsigned int currentWidth = 0, currentHeight = 0;
 static const uint32_t *currentPixels = nullptr;
 static uint32_t frameBackground = 0;
 typedef struct { int x,y,w,h; const uint32_t *pixels; unsigned int tw,th; } DrawCommand;
-static DrawCommand commands[128];
+static DrawCommand commands[1024];
 static unsigned int commandCount = 0;
 
 static const float texCoords[8] = {
@@ -185,7 +185,7 @@ void UtopiaRendererBegin(uint32_t background_rgba) {
 
 void UtopiaRendererDrawSprite(int x, int y, int w, int h, const uint32_t *pixels,
                               unsigned int texture_width, unsigned int texture_height) {
-    if (commandCount < 128) commands[commandCount++] = (DrawCommand){x,y,w,h,pixels,texture_width,texture_height};
+    if (commandCount < 1024) commands[commandCount++] = (DrawCommand){x,y,w,h,pixels,texture_width,texture_height};
     if (!uploadTexture(pixels, texture_width, texture_height)) return;
     setQuad(x,y,w,h);
     bindAndDraw();
