@@ -1,4 +1,4 @@
-# Utopia Game Studio 0.8
+# Utopia Game Studio 0.9
 
 Utopia Game Studio is an independent visual creator for native Wii U homebrew games. Its first complete framework is focused on **2D and 2.5D RPGs**, with other genres planned later.
 
@@ -63,6 +63,21 @@ Version 0.8 replaces the original CPU pixel-plotting runtime with a native Wii U
 
 The current development renderer uses **CafeGLSL** to compile Utopia's small built-in vertex and pixel shaders on the Wii U. Place `glslcompiler.rpl` in `wiiu/libs/` on the SD card. The renderer reports initialization failure rather than silently falling back to the old CPU renderer.
 
+## Tile maps and room editor
+
+Version 0.9 adds the first editable RPG environment:
+
+- A **Room / Tiles** tab for a single 1280×720 room.
+- 32×32 PNG tile import with up to 255 tile definitions.
+- Paint, erase, and flood-fill tools on a 40×23 tile grid.
+- Per-tile **Solid collision** metadata.
+- Test Run now draws the room and prevents the player from entering solid tiles.
+- Wii U export writes the tile textures, room map, and collision table into the native project.
+- The GX2 renderer caches tile and sprite textures so repeated room tiles are uploaded once and reused.
+- Export folders are versioned as `utopia_wiiu_export_v0_9`.
+
+The final tile row extends slightly below the 720-pixel viewport and is clipped naturally; gameplay remains bounded to 1280×720. Multiple rooms, transitions, scrolling, and camera support are intentionally deferred until the fixed-room system is validated.
+
 ## Test Run
 
 Version 0.75 adds **Test Run** to the main toolbar. It opens a resizable desktop preview that uses the current project and Blueprint movement setup without requiring a Wii U export.
@@ -111,8 +126,8 @@ Removing one of those links disables that direction in the exported game. Start,
 5. In the devkitPro MSYS2 terminal, enter the exported `utopia_wiiu_export` directory and run `make`.
 6. Copy `game.wuhb` to `wiiu/apps/utopia_test/game.wuhb` on the Aroma SD card.
 
-## Version 0.8 test
+## Version 0.9 test
 
-First verify **Test Run** as before. Then export and build the Wii U project, install `glslcompiler.rpl` in `wiiu/libs/`, and test on Wii U hardware. Confirm the same scene appears on TV and GamePad, animation remains crisp and transparent, movement/Run Modifier behavior is unchanged, and rendering stays smooth while moving and animating.
+Import a few 32×32 tiles, mark at least one tile solid, paint a small room, and run **Test Run**. Confirm the room renders behind the player and solid tiles block movement from every direction. Then export `utopia_wiiu_export_v0_9`, build it, and test the same behavior in Cemu or on Wii U hardware when available.
 
 Utopia Game Studio is not affiliated with or endorsed by Nintendo, Epic Games, or YoYo Games.
