@@ -6,6 +6,13 @@
 #include "renderer.h"
 #include "room_data.h"
 
+static int bp_speed_percent(int idx, int fallback, int lo, int hi) {
+    int value = idx >= 0 ? bp_vars[idx] : fallback;
+    if (value < lo) value = lo;
+    if (value > hi) value = hi;
+    return value;
+}
+
 static int room_blocked(int x, int y) {
     const int points[4][2] = {{x,y},{x+PLAYER_W-1,y},{x,y+PLAYER_H-1},{x+PLAYER_W-1,y+PLAYER_H-1}};
     for (int i=0;i<4;++i) {
@@ -48,25 +55,34 @@ int main(int argc, char **argv)
         int speed_x = PLAYER_SPEED, speed_y = PLAYER_SPEED;
         VPADRead(VPAD_CHAN_0, &input, 1, &error);
         if (error == VPAD_READ_SUCCESS) {
+            BPApplyTriggered(input.trigger);
 #if BP_MOVE_LEFT
-            if (input.hold & VPAD_BUTTON_LEFT)  { move_x -= 1; speed_x = PLAYER_SPEED * BP_MOVE_LEFT_SPEED / 100; }
+            if ((input.hold & VPAD_BUTTON_LEFT) && bp_gate(BP_MOVE_LEFT_GATE_VAR, BP_MOVE_LEFT_GATE_OP, BP_MOVE_LEFT_GATE_VALUE)) {
+                move_x -= 1; speed_x = PLAYER_SPEED * bp_speed_percent(BP_MOVE_LEFT_SPEED_VAR, BP_MOVE_LEFT_SPEED, 1, 400) / 100;
+            }
 #endif
 #if BP_MOVE_RIGHT
-            if (input.hold & VPAD_BUTTON_RIGHT) { move_x += 1; speed_x = PLAYER_SPEED * BP_MOVE_RIGHT_SPEED / 100; }
+            if ((input.hold & VPAD_BUTTON_RIGHT) && bp_gate(BP_MOVE_RIGHT_GATE_VAR, BP_MOVE_RIGHT_GATE_OP, BP_MOVE_RIGHT_GATE_VALUE)) {
+                move_x += 1; speed_x = PLAYER_SPEED * bp_speed_percent(BP_MOVE_RIGHT_SPEED_VAR, BP_MOVE_RIGHT_SPEED, 1, 400) / 100;
+            }
 #endif
 #if BP_MOVE_UP
-            if (input.hold & VPAD_BUTTON_UP)    { move_y -= 1; speed_y = PLAYER_SPEED * BP_MOVE_UP_SPEED / 100; }
+            if ((input.hold & VPAD_BUTTON_UP) && bp_gate(BP_MOVE_UP_GATE_VAR, BP_MOVE_UP_GATE_OP, BP_MOVE_UP_GATE_VALUE)) {
+                move_y -= 1; speed_y = PLAYER_SPEED * bp_speed_percent(BP_MOVE_UP_SPEED_VAR, BP_MOVE_UP_SPEED, 1, 400) / 100;
+            }
 #endif
 #if BP_MOVE_DOWN
-            if (input.hold & VPAD_BUTTON_DOWN)  { move_y += 1; speed_y = PLAYER_SPEED * BP_MOVE_DOWN_SPEED / 100; }
+            if ((input.hold & VPAD_BUTTON_DOWN) && bp_gate(BP_MOVE_DOWN_GATE_VAR, BP_MOVE_DOWN_GATE_OP, BP_MOVE_DOWN_GATE_VALUE)) {
+                move_y += 1; speed_y = PLAYER_SPEED * bp_speed_percent(BP_MOVE_DOWN_SPEED_VAR, BP_MOVE_DOWN_SPEED, 1, 400) / 100;
+            }
 #endif
 #if BP_RUN_ENABLED
-            if (input.hold & BP_RUN_BUTTON) running = 1;
+            if ((input.hold & BP_RUN_BUTTON) && bp_gate(BP_RUN_GATE_VAR, BP_RUN_GATE_OP, BP_RUN_GATE_VALUE)) running = 1;
 #endif
             if (input.trigger & VPAD_BUTTON_PLUS) break;
         }
         /* 181/256 is approximately 1/sqrt(2), keeping diagonals from moving faster. */
-        if (running) { speed_x = speed_x * BP_RUN_SPEED / 100; speed_y = speed_y * BP_RUN_SPEED / 100; }
+        if (running) { int run_percent = bp_speed_percent(BP_RUN_SPEED_VAR, BP_RUN_SPEED, 101, 400); speed_x = speed_x * run_percent / 100; speed_y = speed_y * run_percent / 100; }
         if (move_x && move_y) { speed_x = speed_x * 181 / 256; speed_y = speed_y * 181 / 256; }
         if (speed_x < 1) speed_x = 1;
         if (speed_y < 1) speed_y = 1;
