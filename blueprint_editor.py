@@ -241,31 +241,38 @@ class BlueprintPanel(ttk.Frame):
  def compiled_config(self):
   p=self.get_project();g=self.graph();lookup={n["id"]:n for n in g["nodes"]};outs={}
   for l in g["links"]:outs.setdefault(l["from"],[]).append(l["to"])
-  cfg={"variables":{v["name"]:int(v.get("value",0)) for v in variables(p)},"moves":{b:{"enabled":False,"speed":100,"speed_variable":"","gate":None} for b in ("LEFT","RIGHT","UP","DOWN")},"run":{"button":"B","enabled":False,"speed":175,"speed_variable":"","gate":None},"actions":{b:[] for b in BUTTONS}}
-  def add_action(button,node,gate=None):
+  cfg={"variables":{v["name"]:int(v.get("value",0)) for v in variables(p)},"actions":[]}
+  def walk(node_id,source,button=None,gates=None,path=None):
+   gates=list(gates or []);path=set(path or ())
+   if node_id in path:return
+   path.add(node_id);node=lookup.get(node_id)
+   if not node:return
    t=node["type"];pr=node.get("props",{})
-   if t in ("Set Variable","Change Variable") and pr.get("variable") in cfg["variables"]:
-    cfg["actions"][button].append({"type":"set" if t=="Set Variable" else "change","variable":pr["variable"],"value":int(pr.get("value",0)),"gate":gate})
-   elif t=="Move Character" and button in cfg["moves"]:
-    expected={"LEFT":(-1,0),"RIGHT":(1,0),"UP":(0,-1),"DOWN":(0,1)}[button]
-    if (pr.get("dx",0),pr.get("dy",0))==expected:cfg["moves"][button]={"enabled":True,"speed":max(1,min(400,int(pr.get("speed_percent",100)))),"speed_variable":pr.get("speed_variable","") if pr.get("speed_variable","") in cfg["variables"] else "","gate":gate}
-   elif t=="Run Modifier":
-    cfg["run"]={"button":button,"enabled":True,"speed":max(101,min(400,int(pr.get("speed_percent",175)))),"speed_variable":pr.get("speed_variable","") if pr.get("speed_variable","") in cfg["variables"] else "","gate":gate}
+   if t=="Compare Variable":
+    name=pr.get("variable","")
+    if name not in cfg["variables"]:return
+    gates.append({"variable":name,"op":pr.get("op","=="),"value":int(pr.get("value",0))})
+   elif t in ("Move Character","Run Modifier","Set Variable","Change Variable"):
+    action={"type":t,"source":source,"button":button,"gates":list(gates)}
+    if t=="Move Character":
+     action.update(dx=int(pr.get("dx",0)),dy=int(pr.get("dy",0)),speed=max(1,min(400,int(pr.get("speed_percent",100)))),speed_variable=pr.get("speed_variable","") if pr.get("speed_variable","") in cfg["variables"] else "")
+    elif t=="Run Modifier":
+     action.update(speed=max(101,min(400,int(pr.get("speed_percent",175)))),speed_variable=pr.get("speed_variable","") if pr.get("speed_variable","") in cfg["variables"] else "")
+    else:
+     name=pr.get("variable","")
+     if name in cfg["variables"]:action.update(variable=name,value=int(pr.get("value",0)));cfg["actions"].append(action)
+     action=None
+    if action is not None:cfg["actions"].append(action)
+   for child in outs.get(node_id,[]):walk(child,source,button,gates,path)
   for n in g["nodes"]:
-   if n["type"]!="GamePad Input":continue
-   button=n.get("props",{}).get("button","")
-   if button not in BUTTONS:continue
-   for target_id in outs.get(n["id"],[]):
-    target=lookup.get(target_id)
-    if not target:continue
-    if target["type"]=="Compare Variable":
-     pr=target.get("props",{});name=pr.get("variable","")
-     if name not in cfg["variables"]:continue
-     gate={"variable":name,"op":pr.get("op","=="),"value":int(pr.get("value",0))}
-     for next_id in outs.get(target["id"],[]):
-      child=lookup.get(next_id)
-      if child:add_action(button,child,gate)
-    else:add_action(button,target,None)
+   if n["type"]=="Start":
+    for child in outs.get(n["id"],[]):walk(child,"start",None,[],{n["id"]})
+   elif n["type"]=="Update":
+    for child in outs.get(n["id"],[]):walk(child,"update",None,[],{n["id"]})
+   elif n["type"]=="GamePad Input":
+    button=n.get("props",{}).get("button","")
+    if button in BUTTONS:
+     for child in outs.get(n["id"],[]):walk(child,"input",button,[],{n["id"]})
   return cfg
  def movement_config(self):return self.compiled_config()
  def write_header(self,path):
@@ -275,20 +282,33 @@ class BlueprintPanel(ttk.Frame):
   for n,i in index.items():lines.append(f"#define BP_VAR_{clean_name(n).upper()} {i}")
   lines += [
    "static inline int bp_compare_value(int left,int op,int right){switch(op){case 0:return left==right;case 1:return left!=right;case 2:return left<right;case 3:return left<=right;case 4:return left>right;case 5:return left>=right;default:return 1;}}",
-   "static inline int bp_gate(int idx,int op,int value){return idx<0?1:bp_compare_value(bp_vars[idx],op,value);}"
+   "static inline int bp_gate(int idx,int op,int value){return idx<0?1:bp_compare_value(bp_vars[idx],op,value);}",
+   "static inline int bp_speed_percent(int idx,int fallback,int lo,int hi){int value=idx>=0?bp_vars[idx]:fallback;if(value<lo)value=lo;if(value>hi)value=hi;return value;}"
   ]
-  def gate_fields(g):
-   if not g:return (-1,0,0)
-   return (index.get(g["variable"],-1),OP_CODES.get(g["op"],0),int(g["value"]))
-  for key,m in cfg["moves"].items():
-   gi,go,gv=gate_fields(m["gate"]);vi=index.get(m["speed_variable"],-1)
-   lines += [f"#define BP_MOVE_{key} {int(m['enabled'])}",f"#define BP_MOVE_{key}_SPEED {m['speed']}",f"#define BP_MOVE_{key}_SPEED_VAR {vi}",f"#define BP_MOVE_{key}_GATE_VAR {gi}",f"#define BP_MOVE_{key}_GATE_OP {go}",f"#define BP_MOVE_{key}_GATE_VALUE {gv}"]
-  run=cfg["run"];gi,go,gv=gate_fields(run["gate"]);vi=index.get(run["speed_variable"],-1)
-  lines += [f"#define BP_RUN_ENABLED {int(run['enabled'])}",f"#define BP_RUN_BUTTON VPAD_BUTTON_{run['button']}",f"#define BP_RUN_SPEED {run['speed']}",f"#define BP_RUN_SPEED_VAR {vi}",f"#define BP_RUN_GATE_VAR {gi}",f"#define BP_RUN_GATE_OP {go}",f"#define BP_RUN_GATE_VALUE {gv}"]
-  lines.append("static inline void BPApplyTriggered(uint32_t trigger){")
-  for button,actions in cfg["actions"].items():
-   for a in actions:
-    idx=index[a["variable"]];gi,go,gv=gate_fields(a["gate"]);op="=" if a["type"]=="set" else "+="
-    lines.append(f" if((trigger & VPAD_BUTTON_{button}) && bp_gate({gi},{go},{gv})) bp_vars[{idx}] {op} {int(a['value'])};")
+  def gate_expr(action):
+   parts=[f"bp_gate({index.get(g['variable'],-1)},{OP_CODES.get(g['op'],0)},{int(g['value'])})" for g in action.get("gates",[])]
+   return " && ".join(parts) if parts else "1"
+  def source_expr(action,trigger=False):
+   source=action["source"]
+   if source=="start":return "first_frame"
+   if source=="update":return "1"
+   button=action.get("button","A")
+   return f"({'trigger' if trigger else 'hold'} & VPAD_BUTTON_{button})"
+  lines.append("static inline void BPApplyFrameActions(uint32_t trigger,int first_frame){")
+  for a in cfg["actions"]:
+   if a["type"] not in ("Set Variable","Change Variable"):continue
+   cond=f"({source_expr(a,True)}) && ({gate_expr(a)})";idx=index[a["variable"]];op="=" if a["type"]=="Set Variable" else "+="
+   lines.append(f" if({cond}) bp_vars[{idx}] {op} {int(a['value'])};")
+  lines.append("}")
+  lines.append("static inline void BPCollectMovement(uint32_t hold,int first_frame,int *move_x100,int *move_y100,int *run_percent){")
+  lines.append(" *move_x100=0; *move_y100=0; *run_percent=100;")
+  for a in cfg["actions"]:
+   if a["type"] not in ("Move Character","Run Modifier"):continue
+   cond=f"({source_expr(a,False)}) && ({gate_expr(a)})";vi=index.get(a.get("speed_variable",""),-1)
+   if a["type"]=="Move Character":
+    lines.append(f" if({cond}){{int s=bp_speed_percent({vi},{a['speed']},1,400);*move_x100 += {a['dx']}*s;*move_y100 += {a['dy']}*s;}}")
+   else:
+    lines.append(f" if({cond}) *run_percent=bp_speed_percent({vi},{a['speed']},101,400);")
   lines.append("}")
   path.write_text("\n".join(lines)+"\n",encoding="utf-8")
+
