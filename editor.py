@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Utopia Game Studio 0.95.01 - RPG-focused 2D/2.5D Wii U homebrew editor."""
+"""Utopia Game Studio 0.95.02 - RPG-focused 2D/2.5D Wii U homebrew editor."""
 import base64, json, shutil, struct, zlib
 from pathlib import Path
 import tkinter as tk
 from tkinter import colorchooser, filedialog, messagebox, simpledialog, ttk
 from blueprint_editor import BlueprintPanel, default_graph
 
-APP_NAME, VERSION = "Utopia Game Studio", "0.95.01"
+APP_NAME, VERSION = "Utopia Game Studio", "0.95.02"
 ROOT = Path(__file__).resolve().parent
 TEMPLATE = ROOT / "runtime_template"
 ANIMATION_STATES=("idle_down","idle_left","idle_right","idle_up","walk_down","walk_left","walk_right","walk_up")
@@ -121,9 +121,9 @@ class TestRunner(tk.Toplevel):
  BUTTON_KEYS={"A":"z","B":"x","X":"c","Y":"v"}
  def __init__(self,parent,project,movement):
   super().__init__(parent);self.title(f"{APP_NAME} Test Run");self.geometry("960x600");self.minsize(640,400);self.project=json.loads(json.dumps(project));self.bp=movement
-  self.moves=self.bp["moves"];self.run_cfg=self.bp["run"];self.bp_vars=dict(self.bp["variables"])
+  self.bp_vars=dict(self.bp.get("variables",{}));self.first_tick=True
   self.pressed=set();self.x=float(self.project["player_x"]);self.y=float(self.project["player_y"]);self.facing="down";self.frame=0;self.anim_tick=0;self.last_anim=None;self.photos={};self.closed=False
-  info=ttk.Frame(self,padding=6);info.pack(fill="x");ttk.Label(info,text="Move: Arrow keys or WASD   •   Run: Shift or configured button (A=Z, B=X, X=C, Y=V)   •   Esc: Stop",anchor="center").pack(fill="x")
+  info=ttk.Frame(self,padding=6);info.pack(fill="x");ttk.Label(info,text="Move: Arrow keys or WASD   •   Wii U A=Z, B=X, X=C, Y=V   •   Shift also tests connected Run Modifier nodes   •   Esc: Stop",anchor="center").pack(fill="x")
   self.canvas=tk.Canvas(self,background=self.project["background"],highlightthickness=0);self.canvas.pack(fill="both",expand=True)
   self.bind("<KeyPress>",self.key_down);self.bind("<KeyRelease>",self.key_up);self.bind("<Escape>",lambda _e:self.close());self.bind("<FocusOut>",lambda _e:self.pressed.clear());self.protocol("WM_DELETE_WINDOW",self.close);self.focus_force();self.after(16,self.tick)
  def close(self):self.closed=True;self.destroy()
@@ -132,22 +132,49 @@ class TestRunner(tk.Toplevel):
   if fresh:
    button=next((b for b,k in self.BUTTON_KEYS.items() if k==key),None)
    if button is None:button=next((b for b,keys in self.KEY_GROUPS.items() if key in keys),None)
-   if button:self.apply_actions(button)
+   if button:self.apply_input_actions(button)
  def key_up(self,event):self.pressed.discard(event.keysym.lower())
- def held(self,name):return bool(self.KEY_GROUPS[name]&self.pressed)
+ def button_held(self,name):
+  if name in self.KEY_GROUPS:return bool(self.KEY_GROUPS[name]&self.pressed)
+  return self.BUTTON_KEYS.get(name,"") in self.pressed
  def compare(self,left,op,right):
   return {"==":left==right,"!=":left!=right,"<":left<right,"<=":left<=right,">":left>right,">=":left>=right}.get(op,True)
- def gate_ok(self,gate):
-  return not gate or self.compare(self.bp_vars.get(gate["variable"],0),gate.get("op","=="),int(gate.get("value",0)))
- def action_speed(self,cfg,lo,hi):
-  value=self.bp_vars.get(cfg.get("speed_variable",""),cfg.get("speed",100))
+ def gates_ok(self,action):
+  return all(self.compare(self.bp_vars.get(g["variable"],0),g.get("op","=="),int(g.get("value",0))) for g in action.get("gates",[]))
+ def action_speed(self,action,lo,hi):
+  value=self.bp_vars.get(action.get("speed_variable",""),action.get("speed",100))
   return max(lo,min(hi,int(value)))
- def apply_actions(self,button):
-  for action in self.bp.get("actions",{}).get(button,[]):
-   if not self.gate_ok(action.get("gate")):continue
-   name=action["variable"];value=int(action.get("value",0))
-   if action["type"]=="set":self.bp_vars[name]=value
-   else:self.bp_vars[name]=self.bp_vars.get(name,0)+value
+ def apply_variable_action(self,action):
+  if not self.gates_ok(action):return
+  name=action.get("variable","");value=int(action.get("value",0))
+  if name not in self.bp_vars:return
+  if action["type"]=="Set Variable":self.bp_vars[name]=value
+  else:self.bp_vars[name]=self.bp_vars.get(name,0)+value
+ def apply_input_actions(self,button):
+  for action in self.bp.get("actions",[]):
+   if action.get("source")=="input" and action.get("button")==button and action.get("type") in ("Set Variable","Change Variable"):self.apply_variable_action(action)
+ def apply_frame_variable_actions(self,first):
+  for action in self.bp.get("actions",[]):
+   if action.get("type") not in ("Set Variable","Change Variable"):continue
+   source=action.get("source")
+   if source=="update" or (source=="start" and first):self.apply_variable_action(action)
+ def action_active(self,action,first):
+  source=action.get("source")
+  if source=="start":return first
+  if source=="update":return True
+  return self.button_held(action.get("button",""))
+ def collect_movement(self,first):
+  vx100=vy100=0;run_percent=100;shift=bool({"shift_l","shift_r"}&self.pressed)
+  for action in self.bp.get("actions",[]):
+   t=action.get("type")
+   if t not in ("Move Character","Run Modifier") or not self.gates_ok(action):continue
+   active=self.action_active(action,first)
+   if t=="Run Modifier" and action.get("source")=="input" and shift:active=True
+   if not active:continue
+   if t=="Move Character":
+    speed=self.action_speed(action,1,400);vx100+=int(action.get("dx",0))*speed;vy100+=int(action.get("dy",0))*speed
+   else:run_percent=self.action_speed(action,101,400)
+  return vx100,vy100,run_percent
  def current_animation(self,moving):
   key=("walk_" if moving else "idle_")+self.facing;assigned=self.project.get("directional_animations",{}).get(key,"") or self.project.get("active_animation","")
   animation=self.project.get("animations",{}).get(assigned,{})
@@ -160,16 +187,11 @@ class TestRunner(tk.Toplevel):
   return self.photos[key]
  def tick(self):
   if self.closed or not self.winfo_exists():return
-  right=self.moves["RIGHT"];left=self.moves["LEFT"];down=self.moves["DOWN"];up=self.moves["UP"]
-  dx=int(right["enabled"] and self.gate_ok(right.get("gate")) and self.held("RIGHT"))-int(left["enabled"] and self.gate_ok(left.get("gate")) and self.held("LEFT"))
-  dy=int(down["enabled"] and self.gate_ok(down.get("gate")) and self.held("DOWN"))-int(up["enabled"] and self.gate_ok(up.get("gate")) and self.held("UP"))
-  xcfg=right if dx>0 else left if dx<0 else {"speed":100};ycfg=down if dy>0 else up if dy<0 else {"speed":100}
-  speed_x=self.project["player_speed"]*self.action_speed(xcfg,1,400)/100;speed_y=self.project["player_speed"]*self.action_speed(ycfg,1,400)/100
-  run_key=self.BUTTON_KEYS.get(self.run_cfg.get("button","B"),"");running=bool(self.run_cfg.get("enabled") and self.gate_ok(self.run_cfg.get("gate")) and ({"shift_l","shift_r",run_key}&self.pressed))
-  if running:
-   run_speed=self.action_speed(self.run_cfg,101,400);speed_x*=run_speed/100;speed_y*=run_speed/100
-  if dx and dy:speed_x*=181/256;speed_y*=181/256
-  nx=max(0,min(1280-self.project["player_width"],self.x+dx*speed_x));ny=max(0,min(720-self.project["player_height"],self.y+dy*speed_y))
+  first=self.first_tick;self.apply_frame_variable_actions(first);vx100,vy100,run_percent=self.collect_movement(first);self.first_tick=False
+  dx=self.project["player_speed"]*vx100/100.0;dy=self.project["player_speed"]*vy100/100.0
+  if run_percent!=100:dx*=run_percent/100.0;dy*=run_percent/100.0
+  if dx and dy:dx*=181/256;dy*=181/256
+  nx=max(0,min(1280-self.project["player_width"],self.x+dx));ny=max(0,min(720-self.project["player_height"],self.y+dy))
   if not self.blocked(nx,self.y):self.x=nx
   if not self.blocked(self.x,ny):self.y=ny
   if dy>0:self.facing="down"
