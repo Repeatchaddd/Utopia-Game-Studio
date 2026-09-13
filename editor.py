@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Utopia Game Studio v1.95.001.000 - 2D/2.5D Wii U game creator."""
+"""Utopia Game Studio v1.95.001.001 - 2D/2.5D Wii U game creator."""
 import base64, json, shutil, struct, zlib
 from pathlib import Path
 import tkinter as tk
@@ -7,7 +7,7 @@ from tkinter import colorchooser, filedialog, messagebox, simpledialog, ttk
 from blueprint_editor import BlueprintPanel, default_graph
 from game_framework import FrameworkPanel, GameRuntime, default_framework, ensure_framework
 
-APP_NAME, VERSION = "Utopia Game Studio", "1.95.001.000"
+APP_NAME, VERSION = "Utopia Game Studio", "1.95.001.001"
 ROOT = Path(__file__).resolve().parent
 TEMPLATE = ROOT / "runtime_template"
 ANIMATION_STATES=("idle_down","idle_left","idle_right","idle_up","walk_down","walk_left","walk_right","walk_up")
