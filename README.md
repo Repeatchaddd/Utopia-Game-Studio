@@ -1,4 +1,4 @@
-# Utopia Game Studio 0.9
+# Utopia Game Studio 0.95
 
 Utopia Game Studio is an independent visual creator for native Wii U homebrew games. Its first complete framework is focused on **2D and 2.5D RPGs**, with other genres planned later.
 
@@ -48,6 +48,25 @@ Version 0.72 improves Blueprint movement speed control:
 - Connect a GamePad Input node to Run Modifier to choose the run button. New projects use **B** at 175% by default.
 - Holding the connected run button changes actual exported Wii U movement speed; diagonal normalization still applies.
 - Older Blueprint projects default existing movement nodes to 100% speed.
+
+## Blueprint variables and conditional logic
+
+Version 0.95 expands Blueprint logic into a reusable runtime variable system.
+
+- Add named integer variables with starting values from the new **Variables** button in Blueprint Logic.
+- **Set Variable** assigns a value when its connected GamePad input is triggered.
+- **Change Variable** adds or subtracts from a variable.
+- **Compare Variable** supports `==`, `!=`, `<`, `<=`, `>`, and `>=` and can gate connected actions.
+- **Move Character** speed can use either a constant percentage or a variable value.
+- **Run Modifier** speed can also use a variable value.
+- Variable-driven movement is clamped to 1–400%; variable-driven running is clamped to 101–400%.
+- GamePad Input → Compare Variable → Move/Run/Set/Change is compiled for both Test Run and the native Wii U runtime.
+- Variable actions trigger once when a mapped button is pressed; movement and run nodes continue to respond while their inputs are held.
+- Older projects load with an empty variable list and keep their existing constant movement values.
+
+Example: create `WalkSpeed = 100`, select `WalkSpeed` as the speed source on a Move Character node, then connect another button to **Set Variable** or **Change Variable** to modify movement speed while the game is running.
+
+Versioned export folders now use `utopia_wiiu_export_v0_95`. Small follow-up builds may use three-part versions such as `0.95.1`, `0.95.2`, and so on.
 
 ## Native Wii U GX2 renderer
 
@@ -123,11 +142,11 @@ Removing one of those links disables that direction in the exported game. Start,
 2. Double-click `run_editor.bat`.
 3. Save a `.ugs` project and choose **Export Wii U Project**.
 4. Install devkitPro and `wiiu-dev` from https://devkitpro.org/wiki/Getting_Started.
-5. In the devkitPro MSYS2 terminal, enter the exported `utopia_wiiu_export` directory and run `make`.
+5. In the devkitPro MSYS2 terminal, enter the versioned exported `utopia_wiiu_export_v0_95` directory and run `make`.
 6. Copy `game.wuhb` to `wiiu/apps/utopia_test/game.wuhb` on the Aroma SD card.
 
-## Version 0.9 test
+## Version 0.95 test
 
-Import a few 32×32 tiles, mark at least one tile solid, paint a small room, and run **Test Run**. Confirm the room renders behind the player and solid tiles block movement from every direction. Then export `utopia_wiiu_export_v0_9`, build it, and test the same behavior in Cemu or on Wii U hardware when available.
+Create a variable such as `WalkSpeed = 100`, assign it as the speed source for the four Move Character nodes, then connect a GamePad button to **Set Variable** or **Change Variable**. In Test Run, confirm the button changes movement speed immediately. Also test a **Compare Variable** between an input and a movement/action node to confirm the action is allowed only when the comparison is true. Then export `utopia_wiiu_export_v0_95` and repeat the same test in Cemu or on Wii U hardware when available.
 
 Utopia Game Studio is not affiliated with or endorsed by Nintendo, Epic Games, or YoYo Games.
