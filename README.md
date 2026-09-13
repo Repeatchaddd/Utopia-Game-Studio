@@ -1,9 +1,9 @@
-# Utopia Game Studio v1.95.001.000
+# Utopia Game Studio v1.95.001.001
 
 **Current development stage:** 1.95  
-**Build:** 1.95.001.000
+**Build:** 1.95.001.001
 
-## v1.95.001.000 — Game Creator Skeleton
+## v1.95.001.001 — Game Creator Skeleton
 
 This release establishes Utopia as a simple general-purpose 2D/2.5D game creator rather than only a movement/animation editor.
 
@@ -21,7 +21,14 @@ New framework capabilities:
 
 The Game Framework tab is the first skeleton layer. More node types, visual instance placement, object animation assignment, richer conditions, and Wii U runtime parity will be expanded through later 1.95.xxx.xxx builds.
 
+## v1.95.001.001 startup fix
+
+- Corrected the packaged Python 3.14 startup issue where `tk.BooleanVar(False)` treated `False` as the Tk master argument.
+- Packaged build now uses `tk.BooleanVar(value=False)`.
+- No project-format or framework behavior change is intended by this patch.
+
 ---
+
 
 
 Utopia Game Studio is an independent visual creator for native Wii U homebrew games. Its first complete framework is focused on **2D and 2.5D RPGs**, with other genres planned later.
