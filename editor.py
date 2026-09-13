@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""Utopia Game Studio 0.9 - RPG-focused 2D/2.5D Wii U homebrew editor."""
+"""Utopia Game Studio 0.95 - RPG-focused 2D/2.5D Wii U homebrew editor."""
 import base64, json, shutil, struct, zlib
 from pathlib import Path
 import tkinter as tk
 from tkinter import colorchooser, filedialog, messagebox, simpledialog, ttk
 from blueprint_editor import BlueprintPanel, default_graph
 
-APP_NAME, VERSION = "Utopia Game Studio", "0.9"
+APP_NAME, VERSION = "Utopia Game Studio", "0.95"
 ROOT = Path(__file__).resolve().parent
 TEMPLATE = ROOT / "runtime_template"
 ANIMATION_STATES=("idle_down","idle_left","idle_right","idle_up","walk_down","walk_left","walk_right","walk_up")
-DEFAULT = {"format":"utopia-project-6","title":"My Utopia RPG","author":"Homebrew Developer",
+DEFAULT = {"format":"utopia-project-7","title":"My Utopia RPG","author":"Homebrew Developer",
  "game_style":"2D / 2.5D RPG","background":"#18365c","player_color":"#f4d35e",
  "player_x":560,"player_y":320,"player_width":80,"player_height":80,"player_speed":6,
  "animations":{},"active_animation":"","directional_animations":{key:"" for key in ANIMATION_STATES},"blueprint":default_graph(),
- "tiles":[],"room_map":[-1]*(40*23)}
+ "tiles":[],"room_map":[-1]*(40*23),"variables":[]}
 
 def fresh(): return json.loads(json.dumps(DEFAULT))
 def rgba(value): return "0x" + value.lstrip("#").upper() + "FFu"
@@ -120,15 +120,33 @@ class TestRunner(tk.Toplevel):
  KEY_GROUPS={"LEFT":{"left","a"},"RIGHT":{"right","d"},"UP":{"up","w"},"DOWN":{"down","s"}}
  BUTTON_KEYS={"A":"z","B":"x","X":"c","Y":"v"}
  def __init__(self,parent,project,movement):
-  super().__init__(parent);self.title(f"{APP_NAME} Test Run");self.geometry("960x600");self.minsize(640,400);self.project=json.loads(json.dumps(project));self.moves,self.run_button,self.run_speed=movement
+  super().__init__(parent);self.title(f"{APP_NAME} Test Run");self.geometry("960x600");self.minsize(640,400);self.project=json.loads(json.dumps(project));self.bp=movement
+  self.moves=self.bp["moves"];self.run_cfg=self.bp["run"];self.bp_vars=dict(self.bp["variables"])
   self.pressed=set();self.x=float(self.project["player_x"]);self.y=float(self.project["player_y"]);self.facing="down";self.frame=0;self.anim_tick=0;self.last_anim=None;self.photos={};self.closed=False
   info=ttk.Frame(self,padding=6);info.pack(fill="x");ttk.Label(info,text="Move: Arrow keys or WASD   •   Run: Shift or configured button (A=Z, B=X, X=C, Y=V)   •   Esc: Stop",anchor="center").pack(fill="x")
   self.canvas=tk.Canvas(self,background=self.project["background"],highlightthickness=0);self.canvas.pack(fill="both",expand=True)
   self.bind("<KeyPress>",self.key_down);self.bind("<KeyRelease>",self.key_up);self.bind("<Escape>",lambda _e:self.close());self.bind("<FocusOut>",lambda _e:self.pressed.clear());self.protocol("WM_DELETE_WINDOW",self.close);self.focus_force();self.after(16,self.tick)
  def close(self):self.closed=True;self.destroy()
- def key_down(self,event):self.pressed.add(event.keysym.lower())
+ def key_down(self,event):
+  key=event.keysym.lower();fresh=key not in self.pressed;self.pressed.add(key)
+  if fresh:
+   button=next((b for b,k in self.BUTTON_KEYS.items() if k==key),None)
+   if button:self.apply_actions(button)
  def key_up(self,event):self.pressed.discard(event.keysym.lower())
  def held(self,name):return bool(self.KEY_GROUPS[name]&self.pressed)
+ def compare(self,left,op,right):
+  return {"==":left==right,"!=":left!=right,"<":left<right,"<=":left<=right,">":left>right,">=":left>=right}.get(op,True)
+ def gate_ok(self,gate):
+  return not gate or self.compare(self.bp_vars.get(gate["variable"],0),gate.get("op","=="),int(gate.get("value",0)))
+ def action_speed(self,cfg,lo,hi):
+  value=self.bp_vars.get(cfg.get("speed_variable",""),cfg.get("speed",100))
+  return max(lo,min(hi,int(value)))
+ def apply_actions(self,button):
+  for action in self.bp.get("actions",{}).get(button,[]):
+   if not self.gate_ok(action.get("gate")):continue
+   name=action["variable"];value=int(action.get("value",0))
+   if action["type"]=="set":self.bp_vars[name]=value
+   else:self.bp_vars[name]=self.bp_vars.get(name,0)+value
  def current_animation(self,moving):
   key=("walk_" if moving else "idle_")+self.facing;assigned=self.project.get("directional_animations",{}).get(key,"") or self.project.get("active_animation","")
   animation=self.project.get("animations",{}).get(assigned,{})
@@ -141,10 +159,14 @@ class TestRunner(tk.Toplevel):
   return self.photos[key]
  def tick(self):
   if self.closed or not self.winfo_exists():return
-  dx=int(self.moves["RIGHT"]>0 and self.held("RIGHT"))-int(self.moves["LEFT"]>0 and self.held("LEFT"));dy=int(self.moves["DOWN"]>0 and self.held("DOWN"))-int(self.moves["UP"]>0 and self.held("UP"))
-  speed_x=self.project["player_speed"]*(self.moves["RIGHT"] if dx>0 else self.moves["LEFT"] if dx<0 else 100)/100;speed_y=self.project["player_speed"]*(self.moves["DOWN"] if dy>0 else self.moves["UP"] if dy<0 else 100)/100
-  run_key=self.BUTTON_KEYS.get(self.run_button,"");running=bool(self.run_speed and ({"shift_l","shift_r",run_key}&self.pressed))
-  if running:speed_x*=self.run_speed/100;speed_y*=self.run_speed/100
+  right=self.moves["RIGHT"];left=self.moves["LEFT"];down=self.moves["DOWN"];up=self.moves["UP"]
+  dx=int(right["enabled"] and self.gate_ok(right.get("gate")) and self.held("RIGHT"))-int(left["enabled"] and self.gate_ok(left.get("gate")) and self.held("LEFT"))
+  dy=int(down["enabled"] and self.gate_ok(down.get("gate")) and self.held("DOWN"))-int(up["enabled"] and self.gate_ok(up.get("gate")) and self.held("UP"))
+  xcfg=right if dx>0 else left if dx<0 else {"speed":100};ycfg=down if dy>0 else up if dy<0 else {"speed":100}
+  speed_x=self.project["player_speed"]*self.action_speed(xcfg,1,400)/100;speed_y=self.project["player_speed"]*self.action_speed(ycfg,1,400)/100
+  run_key=self.BUTTON_KEYS.get(self.run_cfg.get("button","B"),"");running=bool(self.run_cfg.get("enabled") and self.gate_ok(self.run_cfg.get("gate")) and ({"shift_l","shift_r",run_key}&self.pressed))
+  if running:
+   run_speed=self.action_speed(self.run_cfg,101,400);speed_x*=run_speed/100;speed_y*=run_speed/100
   if dx and dy:speed_x*=181/256;speed_y*=181/256
   nx=max(0,min(1280-self.project["player_width"],self.x+dx*speed_x));ny=max(0,min(720-self.project["player_height"],self.y+dy*speed_y))
   if not self.blocked(nx,self.y):self.x=nx
@@ -353,7 +375,7 @@ class Editor(tk.Tk):
  def load_project(self):
   for k,v in self.vars.items():v.set(str(self.project[k]))
   self.project.setdefault("directional_animations",{})
-  self.project.setdefault("tiles",[]);self.project.setdefault("room_map",[-1]*(40*23))
+  self.project.setdefault("tiles",[]);self.project.setdefault("room_map",[-1]*(40*23));self.project.setdefault("variables",[])
   if len(self.project["room_map"])<40*23:self.project["room_map"]=(self.project["room_map"]+[-1]*(40*23))[:40*23]
   for key in ANIMATION_STATES:self.project["directional_animations"].setdefault(key,"")
   self.photos.clear();self.refresh_animations();self.refresh_tiles();self.blueprint.refresh();self.redraw()
@@ -504,8 +526,8 @@ class Editor(tk.Tk):
   if not path:return
   try:
    data=json.loads(Path(path).read_text(encoding="utf-8"))
-   if data.get("format") not in ("utopia-project-6","utopia-project-5","utopia-project-4","utopia-project-3","utopia-project-2","wugc-project-1"):raise ValueError("Unsupported project format")
-   data["format"]="utopia-project-6";self.project={**fresh(),**data};self.project.setdefault("animations",{});self.project.setdefault("directional_animations",{});self.project.setdefault("blueprint",default_graph());self.project.setdefault("tiles",[]);self.project.setdefault("room_map",[-1]*(40*23));self.project_path=Path(path);self.load_project();self.status.set(f"Opened {Path(path).name}")
+   if data.get("format") not in ("utopia-project-7","utopia-project-6","utopia-project-5","utopia-project-4","utopia-project-3","utopia-project-2","wugc-project-1"):raise ValueError("Unsupported project format")
+   data["format"]="utopia-project-7";self.project={**fresh(),**data};self.project.setdefault("animations",{});self.project.setdefault("directional_animations",{});self.project.setdefault("blueprint",default_graph());self.project.setdefault("tiles",[]);self.project.setdefault("room_map",[-1]*(40*23));self.project.setdefault("variables",[]);self.project_path=Path(path);self.load_project();self.status.set(f"Opened {Path(path).name}")
   except Exception as e:messagebox.showerror(APP_NAME,f"Open failed:\n{e}")
  def save(self):
   if self.project_path is None:return self.save_as()
@@ -576,7 +598,7 @@ class Editor(tk.Tk):
  def export(self):
   folder=filedialog.askdirectory(title="Choose export destination")
   if not folder:return
-  out=Path(folder)/"utopia_wiiu_export_v0_9"
+  out=Path(folder)/"utopia_wiiu_export_v0_95"
   try:
    if out.exists():
     if not messagebox.askyesno(APP_NAME,f"Replace existing export folder?\n{out}"):return
