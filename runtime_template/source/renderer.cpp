@@ -122,8 +122,8 @@ static void bindAndDraw(void) {
 }
 
 bool UtopiaRendererInit(void) {
-    if (!GLSL_Init()) return false;
     WHBGfxInit();
+    if (!GLSL_Init()) { WHBGfxShutdown(); return false; }
 
     char log[1024] = {};
     shaderGroup.vertexShader = GLSL_CompileVertexShader(VERTEX_SHADER, log, sizeof(log), GLSL_COMPILER_FLAG_NONE);
@@ -162,8 +162,8 @@ void UtopiaRendererShutdown(void) {
     GX2RDestroyBufferEx(&texCoordBuffer, GX2R_RESOURCE_BIND_NONE);
     if (shaderGroup.vertexShader && GLSL_FreeVertexShader) GLSL_FreeVertexShader(shaderGroup.vertexShader);
     if (shaderGroup.pixelShader && GLSL_FreePixelShader) GLSL_FreePixelShader(shaderGroup.pixelShader);
+    /* CafeGLSL RPL unloading is intentionally left to title shutdown on Wii U. */
     WHBGfxShutdown();
-    GLSL_Shutdown();
 }
 
 static void colorFloats(uint32_t c, float *r, float *g, float *b, float *a) {
