@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
-"""Utopia Game Studio 0.8 - RPG-focused 2D/2.5D Wii U homebrew editor."""
+"""Utopia Game Studio 0.9 - RPG-focused 2D/2.5D Wii U homebrew editor."""
 import base64, json, shutil, struct, zlib
 from pathlib import Path
 import tkinter as tk
 from tkinter import colorchooser, filedialog, messagebox, simpledialog, ttk
 from blueprint_editor import BlueprintPanel, default_graph
 
-APP_NAME, VERSION = "Utopia Game Studio", "0.8"
+APP_NAME, VERSION = "Utopia Game Studio", "0.9"
 ROOT = Path(__file__).resolve().parent
 TEMPLATE = ROOT / "runtime_template"
 ANIMATION_STATES=("idle_down","idle_left","idle_right","idle_up","walk_down","walk_left","walk_right","walk_up")
 DEFAULT = {"format":"utopia-project-5","title":"My Utopia RPG","author":"Homebrew Developer",
  "game_style":"2D / 2.5D RPG","background":"#18365c","player_color":"#f4d35e",
  "player_x":560,"player_y":320,"player_width":80,"player_height":80,"player_speed":6,
- "animations":{},"active_animation":"","directional_animations":{key:"" for key in ANIMATION_STATES},"blueprint":default_graph()}
+ "animations":{},"active_animation":"","directional_animations":{key:"" for key in ANIMATION_STATES},"blueprint":default_graph(),
+ "tiles":[],"room_map":[-1]*(40*23)}
 
 def fresh(): return json.loads(json.dumps(DEFAULT))
 def rgba(value): return "0x" + value.lstrip("#").upper() + "FFu"
@@ -145,7 +146,9 @@ class TestRunner(tk.Toplevel):
   run_key=self.BUTTON_KEYS.get(self.run_button,"");running=bool(self.run_speed and ({"shift_l","shift_r",run_key}&self.pressed))
   if running:speed_x*=self.run_speed/100;speed_y*=self.run_speed/100
   if dx and dy:speed_x*=181/256;speed_y*=181/256
-  self.x=max(0,min(1280-self.project["player_width"],self.x+dx*speed_x));self.y=max(0,min(720-self.project["player_height"],self.y+dy*speed_y))
+  nx=max(0,min(1280-self.project["player_width"],self.x+dx*speed_x));ny=max(0,min(720-self.project["player_height"],self.y+dy*speed_y))
+  if not self.blocked(nx,self.y):self.x=nx
+  if not self.blocked(self.x,ny):self.y=ny
   if dy>0:self.facing="down"
   elif dx<0:self.facing="left"
   elif dx>0:self.facing="right"
@@ -159,9 +162,28 @@ class TestRunner(tk.Toplevel):
     if self.frame+1<len(frames):self.frame+=1
     elif animation.get("loop",True):self.frame=0
   self.redraw(frames);self.after(16,self.tick)
+ def blocked(self,x,y):
+  tw=32;tiles=self.project.get("tiles",[]);room=self.project.get("room_map",[])
+  points=((x,y),(x+self.project["player_width"]-1,y),(x,y+self.project["player_height"]-1),(x+self.project["player_width"]-1,y+self.project["player_height"]-1))
+  for px,py in points:
+   cx,cy=int(px)//tw,int(py)//tw
+   if 0<=cx<40 and 0<=cy<23:
+    i=room[cy*40+cx] if cy*40+cx<len(room) else -1
+    if 0<=i<len(tiles) and tiles[i].get("solid",False):return True
+  return False
  def redraw(self,frames):
   self.canvas.delete("all");w=max(1,self.canvas.winfo_width());h=max(1,self.canvas.winfo_height());scale=min(w/1280,h/720);ox=(w-1280*scale)/2;oy=(h-720*scale)/2
   self.canvas.create_rectangle(ox,oy,ox+1280*scale,oy+720*scale,fill=self.project["background"],outline="#888")
+  tiles=self.project.get("tiles",[]);room=self.project.get("room_map",[])
+  for gy in range(23):
+   for gx in range(40):
+    pos=gy*40+gx;i=room[pos] if pos<len(room) else -1
+    if 0<=i<len(tiles):
+     tile=tiles[i];key="tile:"+tile["png_base64"]
+     if key not in self.photos:self.photos[key]=tk.PhotoImage(data=tile["png_base64"])
+     pic=self.photos[key];factor=max(1,int(32*scale)//32);shown=pic.zoom(factor,factor) if factor>1 else pic
+     if factor>1:self.photos[key+":shown"]=shown
+     self.canvas.create_image(ox+gx*32*scale,oy+gy*32*scale,image=shown,anchor="nw")
   x=ox+self.x*scale;y=oy+self.y*scale;pw=self.project["player_width"]*scale;ph=self.project["player_height"]*scale
   if frames:
    pic=self.photo(frames[self.frame%len(frames)]);ratio=min(pw/max(1,pic.width()),ph/max(1,pic.height()))
@@ -184,9 +206,9 @@ class Editor(tk.Tk):
   ttk.Label(bar,text="2D / 2.5D",foreground="#356fa6").pack(side="right",padx=8)
   tabs=ttk.Notebook(self); tabs.pack(fill="both",expand=True,padx=8,pady=(0,8))
   self.status=tk.StringVar(value="Ready"); ttk.Label(self,textvariable=self.status,relief="sunken",anchor="w",padding=4).pack(fill="x")
-  scene=ttk.Frame(tabs,padding=8); anim=ttk.Frame(tabs,padding=8); logic=ttk.Frame(tabs)
-  tabs.add(scene,text="Scene"); tabs.add(anim,text="Animated Character"); tabs.add(logic,text="Blueprint Logic")
-  self.build_scene(scene); self.build_anim(anim); self.blueprint=BlueprintPanel(logic,lambda:self.project,self.status);self.blueprint.pack(fill="both",expand=True)
+  scene=ttk.Frame(tabs,padding=8); room=ttk.Frame(tabs,padding=8); anim=ttk.Frame(tabs,padding=8); logic=ttk.Frame(tabs)
+  tabs.add(scene,text="Scene");tabs.add(room,text="Room / Tiles");tabs.add(anim,text="Animated Character");tabs.add(logic,text="Blueprint Logic")
+  self.build_scene(scene);self.build_room(room);self.build_anim(anim);self.blueprint=BlueprintPanel(logic,lambda:self.project,self.status);self.blueprint.pack(fill="both",expand=True)
 
  def build_scene(self,parent):
   body=ttk.Panedwindow(parent,orient="horizontal"); body.pack(fill="both",expand=True)
@@ -204,6 +226,97 @@ class Editor(tk.Tk):
   ttk.Label(panel,text="Drag the character to position it.\nA rectangle is used until frames exist.\nDirectional states are assigned on the\nAnimated Character tab.").grid(row=row+3,column=0,columnspan=2,sticky="w",pady=16)
   self.canvas=tk.Canvas(view,width=640,height=360,highlightthickness=1,highlightbackground="#777"); self.canvas.pack(fill="both",expand=True)
   self.canvas.bind("<Configure>",lambda _e:self.redraw()); self.canvas.bind("<Button-1>",self.drag_start); self.canvas.bind("<B1-Motion>",self.drag_move); self.canvas.bind("<ButtonRelease-1>",lambda _e:setattr(self,"drag",None))
+
+ def build_room(self,parent):
+  parent.columnconfigure(1,weight=1);parent.rowconfigure(0,weight=1)
+  left=ttk.LabelFrame(parent,text="32×32 Tiles",padding=8);left.grid(row=0,column=0,sticky="ns",padx=(0,8))
+  view=ttk.LabelFrame(parent,text="Room 1280×720",padding=8);view.grid(row=0,column=1,sticky="nsew")
+  view.columnconfigure(0,weight=1);view.rowconfigure(0,weight=1)
+  self.tile_list=tk.Listbox(left,width=24,height=18,exportselection=False);self.tile_list.pack(fill="both",expand=True)
+  self.tile_list.bind("<<ListboxSelect>>",lambda _e:self.tile_selected())
+  ttk.Button(left,text="Import 32×32 PNG(s)",command=self.import_tiles).pack(fill="x",pady=(8,3))
+  ttk.Button(left,text="Delete tile",command=self.delete_tile).pack(fill="x")
+  self.tile_solid=tk.BooleanVar(value=False);ttk.Checkbutton(left,text="Solid collision",variable=self.tile_solid,command=self.tile_solid_changed).pack(anchor="w",pady=(10,6))
+  self.room_tool=tk.StringVar(value="paint")
+  for value,label in (("paint","Paint"),("erase","Erase"),("fill","Fill")):ttk.Radiobutton(left,text=label,value=value,variable=self.room_tool).pack(anchor="w")
+  ttk.Label(left,text="Left-click edits the room.\nSolid tiles block Test Run\nand exported Wii U movement.",justify="left").pack(anchor="w",pady=(12,0))
+  self.room_canvas=tk.Canvas(view,background="#202020",highlightthickness=1,highlightbackground="#777");self.room_canvas.grid(row=0,column=0,sticky="nsew")
+  self.room_canvas.bind("<Configure>",lambda _e:self.redraw_room())
+  self.room_canvas.bind("<Button-1>",self.room_click);self.room_canvas.bind("<B1-Motion>",self.room_click)
+
+ def refresh_tiles(self):
+  if not hasattr(self,"tile_list"):return
+  self.tile_list.delete(0,"end")
+  for i,t in enumerate(self.project.get("tiles",[])):self.tile_list.insert("end",f"{i:02d}  {t.get('name','tile')}"+("  [solid]" if t.get("solid") else ""))
+  if self.project.get("tiles") and not self.tile_list.curselection():self.tile_list.selection_set(0)
+  self.tile_selected();self.redraw_room()
+
+ def tile_selected(self):
+  if not hasattr(self,"tile_list"):return
+  s=self.tile_list.curselection();tiles=self.project.get("tiles",[])
+  self.tile_solid.set(bool(s and s[0]<len(tiles) and tiles[s[0]].get("solid",False)))
+
+ def import_tiles(self):
+  paths=filedialog.askopenfilenames(filetypes=[("PNG images","*.png")])
+  try:
+   for path in paths:
+    data=base64.b64encode(Path(path).read_bytes()).decode("ascii");pic=tk.PhotoImage(data=data)
+    if (pic.width(),pic.height())!=(32,32):raise ValueError(f"{Path(path).name} must be exactly 32×32")
+    self.project["tiles"].append({"name":Path(path).name,"png_base64":data,"solid":False})
+   self.photos.clear();self.refresh_tiles()
+  except Exception as e:messagebox.showerror(APP_NAME,f"Tile import failed:\n{e}")
+
+ def delete_tile(self):
+  s=self.tile_list.curselection()
+  if not s:return
+  idx=s[0];del self.project["tiles"][idx]
+  self.project["room_map"]=[(-1 if v==idx else v-1 if v>idx else v) for v in self.project["room_map"]]
+  self.photos.clear();self.refresh_tiles()
+
+ def tile_solid_changed(self):
+  s=self.tile_list.curselection()
+  if s and s[0]<len(self.project["tiles"]):self.project["tiles"][s[0]]["solid"]=bool(self.tile_solid.get());self.refresh_tiles();self.tile_list.selection_set(s[0])
+
+ def room_geometry(self):
+  w=max(1,self.room_canvas.winfo_width());h=max(1,self.room_canvas.winfo_height());scale=min(w/1280,h/720);return scale,(w-1280*scale)/2,(h-720*scale)/2
+
+ def room_click(self,e):
+  scale,ox,oy=self.room_geometry()
+  gx=int((e.x-ox)/(32*scale));gy=int((e.y-oy)/(32*scale))
+  if not (0<=gx<40 and 0<=gy<23):return
+  pos=gy*40+gx;tool=self.room_tool.get();s=self.tile_list.curselection();value=s[0] if s else -1
+  if tool=="erase":self.project["room_map"][pos]=-1
+  elif tool=="paint" and value>=0:self.project["room_map"][pos]=value
+  elif tool=="fill":
+   old=self.project["room_map"][pos]
+   if old==value:return
+   q=[(gx,gy)];seen=set()
+   while q:
+    x,y=q.pop()
+    if (x,y) in seen or not (0<=x<40 and 0<=y<23):continue
+    seen.add((x,y));p=y*40+x
+    if self.project["room_map"][p]!=old:continue
+    self.project["room_map"][p]=value;q.extend(((x-1,y),(x+1,y),(x,y-1),(x,y+1)))
+  self.redraw_room()
+
+ def redraw_room(self):
+  if not hasattr(self,"room_canvas"):return
+  self.room_canvas.delete("all");scale,ox,oy=self.room_geometry()
+  self.room_canvas.create_rectangle(ox,oy,ox+1280*scale,oy+720*scale,fill=self.project["background"],outline="#777")
+  tiles=self.project.get("tiles",[]);room=self.project.get("room_map",[])
+  for gy in range(23):
+   for gx in range(40):
+    p=gy*40+gx;i=room[p] if p<len(room) else -1
+    if 0<=i<len(tiles):
+     key="roomtile:"+tiles[i]["png_base64"]
+     if key not in self.photos:self.photos[key]=tk.PhotoImage(data=tiles[i]["png_base64"])
+     pic=self.photos[key];target=max(1,int(round(32*scale)))
+     if target>=32:factor=max(1,target//32);shown=pic.zoom(factor,factor)
+     else:factor=max(1,32//target);shown=pic.subsample(factor,factor)
+     self.photos[f"{key}:{gx}:{gy}"]=shown
+     self.room_canvas.create_image(ox+gx*32*scale,oy+gy*32*scale,image=shown,anchor="nw")
+  for gx in range(41):self.room_canvas.create_line(ox+gx*32*scale,oy,ox+gx*32*scale,oy+720*scale,fill="#555")
+  for gy in range(24):self.room_canvas.create_line(ox,oy+gy*32*scale,ox+1280*scale,oy+gy*32*scale,fill="#555")
 
  def build_anim(self,parent):
   parent.columnconfigure(1,weight=1); parent.rowconfigure(0,weight=1)
@@ -239,8 +352,10 @@ class Editor(tk.Tk):
  def load_project(self):
   for k,v in self.vars.items():v.set(str(self.project[k]))
   self.project.setdefault("directional_animations",{})
+  self.project.setdefault("tiles",[]);self.project.setdefault("room_map",[-1]*(40*23))
+  if len(self.project["room_map"])<40*23:self.project["room_map"]=(self.project["room_map"]+[-1]*(40*23))[:40*23]
   for key in ANIMATION_STATES:self.project["directional_animations"].setdefault(key,"")
-  self.photos.clear(); self.refresh_animations(); self.blueprint.refresh(); self.redraw()
+  self.photos.clear();self.refresh_animations();self.refresh_tiles();self.blueprint.refresh();self.redraw()
  def fields_changed(self):
   for k in ("title","author"):self.project[k]=self.vars[k].get()
   for k in ("player_x","player_y","player_width","player_height","player_speed"):
@@ -389,7 +504,7 @@ class Editor(tk.Tk):
   try:
    data=json.loads(Path(path).read_text(encoding="utf-8"))
    if data.get("format") not in ("utopia-project-5","utopia-project-4","utopia-project-3","utopia-project-2","wugc-project-1"):raise ValueError("Unsupported project format")
-   data["format"]="utopia-project-5";self.project={**fresh(),**data};self.project.setdefault("animations",{});self.project.setdefault("directional_animations",{});self.project.setdefault("blueprint",default_graph());self.project_path=Path(path);self.load_project();self.status.set(f"Opened {Path(path).name}")
+   data["format"]="utopia-project-5";self.project={**fresh(),**data};self.project.setdefault("animations",{});self.project.setdefault("directional_animations",{});self.project.setdefault("blueprint",default_graph());self.project.setdefault("tiles",[]);self.project.setdefault("room_map",[-1]*(40*23));self.project_path=Path(path);self.load_project();self.status.set(f"Opened {Path(path).name}")
   except Exception as e:messagebox.showerror(APP_NAME,f"Open failed:\n{e}")
  def save(self):
   if self.project_path is None:return self.save_as()
@@ -429,6 +544,34 @@ class Editor(tk.Tk):
    else:lines.append(f"static const UtopiaAnimation ANIM_{state.upper()} = {{0, 0, 1, 1, 1, 1}};")
   lines.insert(2,f"#define HAS_ANIMATION {int(has_any)}")
   (out/"source"/"animation_frames.h").write_text("\n".join(lines)+"\n",encoding="utf-8")
+ def write_room(self,out):
+  lines=["#pragma once","#include <stdint.h>","#define ROOM_COLS 40","#define ROOM_ROWS 23","#define TILE_SIZE 32",f"#define TILE_COUNT {len(self.project.get('tiles',[]))}"]
+  tiles=self.project.get("tiles",[])
+  for n,tile in enumerate(tiles):
+   pic=tk.PhotoImage(data=tile["png_base64"]);pixels=[]
+   for y in range(32):
+    for x in range(32):
+     if pic.transparency_get(x,y):pixels.append("0x00000000u")
+     else:
+      v=pic.get(x,y)
+      if isinstance(v,str):v=v.lstrip("#");r,g,b=[int(v[i:i+2],16) for i in (0,2,4)]
+      else:r,g,b=v[:3]
+      pixels.append(f"0x{r:02X}{g:02X}{b:02X}FFu")
+   lines.append(f"static const uint32_t tile_{n}[1024] = {{")
+   for i in range(0,1024,8):lines.append("    "+", ".join(pixels[i:i+8])+",")
+   lines.append("};")
+  if tiles:
+   lines.append("static const uint32_t *const ROOM_TILES[] = {"+", ".join(f"tile_{i}" for i in range(len(tiles)))+"};")
+   lines.append("static const uint8_t ROOM_SOLID[] = {"+", ".join("1" if t.get("solid") else "0" for t in tiles)+"};")
+  else:
+   lines.append("static const uint32_t *const ROOM_TILES[1] = {0};");lines.append("static const uint8_t ROOM_SOLID[1] = {0};")
+  room=self.project.get("room_map",[-1]*(40*23))
+  encoded=[255 if v<0 or v>=len(tiles) else v for v in room[:40*23]]
+  lines.append("static const uint8_t ROOM_MAP[ROOM_COLS*ROOM_ROWS] = {")
+  for i in range(0,len(encoded),40):lines.append("    "+", ".join(str(v) for v in encoded[i:i+40])+",")
+  lines.append("};")
+  (out/"source"/"room_data.h").write_text("\n".join(lines)+"\n",encoding="utf-8")
+
  def export(self):
   folder=filedialog.askdirectory(title="Choose export destination")
   if not folder:return
@@ -439,9 +582,9 @@ class Editor(tk.Tk):
     shutil.rmtree(out)
    shutil.copytree(TEMPLATE,out);p=self.project
    config=("#pragma once\n"+f"#define GAME_TITLE \"{p['title'].replace(chr(34),'')}\"\n#define START_X {p['player_x']}\n#define START_Y {p['player_y']}\n#define PLAYER_W {p['player_width']}\n#define PLAYER_H {p['player_height']}\n#define PLAYER_SPEED {p['player_speed']}\n#define BACKGROUND_COLOR {rgba(p['background'])}\n#define PLAYER_COLOR {rgba(p['player_color'])}\n")
-   (out/"source"/"game_config.h").write_text(config,encoding="utf-8");self.write_frames(out);self.blueprint.write_header(out/"source"/"blueprint_logic.h")
+   (out/"source"/"game_config.h").write_text(config,encoding="utf-8");self.write_frames(out);self.write_room(out);self.blueprint.write_header(out/"source"/"blueprint_logic.h")
    m=(out/"Makefile").read_text(encoding="utf-8").replace("APP_NAME := Utopia Game Studio Test",f"APP_NAME := {p['title']}").replace("APP_AUTHOR := Utopia",f"APP_AUTHOR := {p['author']}");(out/"Makefile").write_text(m,encoding="utf-8");(out/"project.ugs").write_text(json.dumps(p,indent=2)+"\n",encoding="utf-8")
-   self.status.set(f"Exported to {out}");messagebox.showinfo(APP_NAME,f"Exported to:\n{out}\n\nBuild with: make")
+   self.status.set(f"Exported v{VERSION} to {out}");messagebox.showinfo(APP_NAME,f"Exported Utopia Game Studio v{VERSION} project to:\n{out}\n\nBuild with: make")
   except Exception as e:messagebox.showerror(APP_NAME,f"Export failed:\n{e}")
 
 if __name__=="__main__":Editor().mainloop()
