@@ -131,6 +131,7 @@ class TestRunner(tk.Toplevel):
   key=event.keysym.lower();fresh=key not in self.pressed;self.pressed.add(key)
   if fresh:
    button=next((b for b,k in self.BUTTON_KEYS.items() if k==key),None)
+   if button is None:button=next((b for b,keys in self.KEY_GROUPS.items() if key in keys),None)
    if button:self.apply_actions(button)
  def key_up(self,event):self.pressed.discard(event.keysym.lower())
  def held(self,name):return bool(self.KEY_GROUPS[name]&self.pressed)
