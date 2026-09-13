@@ -1,4 +1,28 @@
-# Utopia Game Studio 0.95.02
+# Utopia Game Studio v1.95.001.000
+
+**Current development stage:** 1.95  
+**Build:** 1.95.001.000
+
+## v1.95.001.000 — Game Creator Skeleton
+
+This release establishes Utopia as a simple general-purpose 2D/2.5D game creator rather than only a movement/animation editor.
+
+New framework capabilities:
+- reusable Game Objects: Player, NPC, Enemy, Item, and Generic
+- multiple rooms with a selectable start room
+- object instances placed into rooms
+- Game Start, Room Start, Update, and Collision events
+- event actions for variables, visibility, destroying objects, room changes, and simple movement
+- global game-state variables shared with Test Run
+- object-to-player and object-to-object collision event dispatch
+- automatic migration of older Utopia project files into the new framework
+- existing Blueprint movement and graph execution retained
+- Test Run now executes both Blueprint logic and the generic game framework
+
+The Game Framework tab is the first skeleton layer. More node types, visual instance placement, object animation assignment, richer conditions, and Wii U runtime parity will be expanded through later 1.95.xxx.xxx builds.
+
+---
+
 
 Utopia Game Studio is an independent visual creator for native Wii U homebrew games. Its first complete framework is focused on **2D and 2.5D RPGs**, with other genres planned later.
 
