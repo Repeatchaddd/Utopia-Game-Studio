@@ -4,7 +4,8 @@ import base64, json, shutil, struct, zlib
 from pathlib import Path
 import tkinter as tk
 from tkinter import colorchooser, filedialog, messagebox, simpledialog, ttk
-from blueprint_editor import BlueprintPanel, default_graph\nfrom game_framework import FrameworkPanel, GameRuntime, default_framework, ensure_framework
+from blueprint_editor import BlueprintPanel, default_graph
+from game_framework import FrameworkPanel, GameRuntime, default_framework, ensure_framework
 
 APP_NAME, VERSION = "Utopia Game Studio", "1.95.001.000"
 ROOT = Path(__file__).resolve().parent
@@ -198,7 +199,8 @@ class TestRunner(tk.Toplevel):
   elif dx<0:self.facing="left"
   elif dx>0:self.facing="right"
   elif dy<0:self.facing="up"
-  self.game.step(self,first)\n  name,animation=self.current_animation(bool(dx or dy));frames=animation.get("frames",[])
+  self.game.step(self,first)
+  name,animation=self.current_animation(bool(dx or dy));frames=animation.get("frames",[])
   if name!=self.last_anim:self.frame=0;self.anim_tick=0;self.last_anim=name
   if frames:
    self.anim_tick+=1;delay=max(1,60//max(1,animation.get("fps",8)))
@@ -229,7 +231,8 @@ class TestRunner(tk.Toplevel):
      pic=self.photos[key];factor=max(1,int(32*scale)//32);shown=pic.zoom(factor,factor) if factor>1 else pic
      if factor>1:self.photos[key+":shown"]=shown
      self.canvas.create_image(ox+gx*32*scale,oy+gy*32*scale,image=shown,anchor="nw")
-  self.game.draw(self.canvas,scale,ox,oy)\n  x=ox+self.x*scale;y=oy+self.y*scale;pw=self.project["player_width"]*scale;ph=self.project["player_height"]*scale
+  self.game.draw(self.canvas,scale,ox,oy)
+  x=ox+self.x*scale;y=oy+self.y*scale;pw=self.project["player_width"]*scale;ph=self.project["player_height"]*scale
   if frames:
    pic=self.photo(frames[self.frame%len(frames)]);ratio=min(pw/max(1,pic.width()),ph/max(1,pic.height()))
    if ratio>=1:factor=max(1,int(ratio));shown=pic.zoom(factor,factor)
