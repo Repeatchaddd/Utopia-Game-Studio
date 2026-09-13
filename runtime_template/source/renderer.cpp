@@ -40,11 +40,14 @@ void main() {
 static WHBGfxShaderGroup shaderGroup = {};
 static GX2RBuffer positionBuffer = {};
 static GX2RBuffer texCoordBuffer = {};
-static GX2Texture texture = {};
 static GX2Sampler sampler = {};
-static bool textureReady = false;
-static unsigned int currentWidth = 0, currentHeight = 0;
-static const uint32_t *currentPixels = nullptr;
+typedef struct {
+    GX2Texture texture;
+    const uint32_t *pixels;
+    unsigned int width, height;
+    bool ready;
+} TextureSlot;
+static TextureSlot textureCache[256] = {};
 static uint32_t frameBackground = 0;
 typedef struct { int x,y,w,h; const uint32_t *pixels; unsigned int tw,th; } DrawCommand;
 static DrawCommand commands[1024];
@@ -57,45 +60,54 @@ static const float texCoords[8] = {
     0.0f, 0.0f
 };
 
-static void destroyTexture(void) {
-    if (textureReady && texture.surface.image) MEMFreeToDefaultHeap(texture.surface.image);
-    memset(&texture, 0, sizeof(texture));
-    textureReady = false;
-    currentWidth = currentHeight = 0;
-    currentPixels = nullptr;
+static void destroyTextures(void) {
+    for (unsigned int i = 0; i < 256; ++i) {
+        if (textureCache[i].ready && textureCache[i].texture.surface.image)
+            MEMFreeToDefaultHeap(textureCache[i].texture.surface.image);
+        memset(&textureCache[i], 0, sizeof(textureCache[i]));
+    }
 }
 
-static bool uploadTexture(const uint32_t *pixels, unsigned int width, unsigned int height) {
-    if (!pixels || !width || !height) return false;
-    if (!textureReady || currentWidth != width || currentHeight != height) {
-        destroyTexture();
-        texture.surface.dim = GX2_SURFACE_DIM_TEXTURE_2D;
-        texture.surface.width = width;
-        texture.surface.height = height;
-        texture.surface.depth = 1;
-        texture.surface.mipLevels = 1;
-        texture.surface.format = GX2_SURFACE_FORMAT_UNORM_R8_G8_B8_A8;
-        texture.surface.aa = GX2_AA_MODE1X;
-        texture.surface.use = GX2_SURFACE_USE_TEXTURE;
-        texture.surface.tileMode = GX2_TILE_MODE_LINEAR_ALIGNED;
-        texture.viewNumSlices = 1;
-        texture.compMap = 0x00010203;
-        GX2CalcSurfaceSizeAndAlignment(&texture.surface);
-        GX2InitTextureRegs(&texture);
-        texture.surface.image = MEMAllocFromDefaultHeapEx(texture.surface.imageSize, texture.surface.alignment);
-        if (!texture.surface.image) return false;
-        textureReady = true;
-        currentWidth = width;
-        currentHeight = height;
-    }
-    if (currentPixels != pixels) {
-        uint32_t *dst = (uint32_t*)texture.surface.image;
-        for (unsigned int y = 0; y < height; ++y)
-            memcpy(dst + y * texture.surface.pitch, pixels + y * width, width * sizeof(uint32_t));
-        GX2Invalidate(GX2_INVALIDATE_MODE_CPU_TEXTURE, texture.surface.image, texture.surface.imageSize);
-        currentPixels = pixels;
-    }
-    return true;
+static GX2Texture *getTexture(const uint32_t *pixels, unsigned int width, unsigned int height) {
+    if (!pixels || !width || !height) return nullptr;
+    for (unsigned int i = 0; i < 256; ++i)
+        if (textureCache[i].ready && textureCache[i].pixels == pixels &&
+            textureCache[i].width == width && textureCache[i].height == height)
+            return &textureCache[i].texture;
+
+    TextureSlot *slot = nullptr;
+    for (unsigned int i = 0; i < 256; ++i)
+        if (!textureCache[i].ready) { slot = &textureCache[i]; break; }
+    if (!slot) return nullptr;
+
+    GX2Texture *texture = &slot->texture;
+    memset(texture, 0, sizeof(*texture));
+    texture->surface.dim = GX2_SURFACE_DIM_TEXTURE_2D;
+    texture->surface.width = width;
+    texture->surface.height = height;
+    texture->surface.depth = 1;
+    texture->surface.mipLevels = 1;
+    texture->surface.format = GX2_SURFACE_FORMAT_UNORM_R8_G8_B8_A8;
+    texture->surface.aa = GX2_AA_MODE1X;
+    texture->surface.use = GX2_SURFACE_USE_TEXTURE;
+    texture->surface.tileMode = GX2_TILE_MODE_LINEAR_ALIGNED;
+    texture->viewNumSlices = 1;
+    texture->compMap = 0x00010203;
+    GX2CalcSurfaceSizeAndAlignment(&texture->surface);
+    GX2InitTextureRegs(texture);
+    texture->surface.image = MEMAllocFromDefaultHeapEx(texture->surface.imageSize, texture->surface.alignment);
+    if (!texture->surface.image) return nullptr;
+
+    uint32_t *dst = (uint32_t*)texture->surface.image;
+    for (unsigned int y = 0; y < height; ++y)
+        memcpy(dst + y * texture->surface.pitch, pixels + y * width, width * sizeof(uint32_t));
+    GX2Invalidate(GX2_INVALIDATE_MODE_CPU_TEXTURE, texture->surface.image, texture->surface.imageSize);
+
+    slot->pixels = pixels;
+    slot->width = width;
+    slot->height = height;
+    slot->ready = true;
+    return texture;
 }
 
 static void setQuad(int x, int y, int w, int h) {
@@ -109,14 +121,14 @@ static void setQuad(int x, int y, int w, int h) {
     GX2RUnlockBufferEx(&positionBuffer, GX2R_RESOURCE_BIND_NONE);
 }
 
-static void bindAndDraw(void) {
+static void bindAndDraw(GX2Texture *texture) {
     GX2SetFetchShader(&shaderGroup.fetchShader);
     GX2SetVertexShader(shaderGroup.vertexShader);
     GX2SetPixelShader(shaderGroup.pixelShader);
     GX2SetShaderMode(GX2_SHADER_MODE_UNIFORM_BLOCK);
     GX2RSetAttributeBuffer(&positionBuffer, 0, positionBuffer.elemSize, 0);
     GX2RSetAttributeBuffer(&texCoordBuffer, 1, texCoordBuffer.elemSize, 0);
-    GX2SetPixelTexture(&texture, shaderGroup.pixelShader->samplerVars[0].location);
+    GX2SetPixelTexture(texture, shaderGroup.pixelShader->samplerVars[0].location);
     GX2SetPixelSampler(&sampler, shaderGroup.pixelShader->samplerVars[0].location);
     GX2DrawEx(GX2_PRIMITIVE_MODE_QUADS, 4, 0, 1);
 }
@@ -157,7 +169,7 @@ bool UtopiaRendererInit(void) {
 }
 
 void UtopiaRendererShutdown(void) {
-    destroyTexture();
+    destroyTextures();
     GX2RDestroyBufferEx(&positionBuffer, GX2R_RESOURCE_BIND_NONE);
     GX2RDestroyBufferEx(&texCoordBuffer, GX2R_RESOURCE_BIND_NONE);
     if (shaderGroup.vertexShader && GLSL_FreeVertexShader) GLSL_FreeVertexShader(shaderGroup.vertexShader);
@@ -186,15 +198,15 @@ void UtopiaRendererBegin(uint32_t background_rgba) {
 void UtopiaRendererDrawSprite(int x, int y, int w, int h, const uint32_t *pixels,
                               unsigned int texture_width, unsigned int texture_height) {
     if (commandCount < 1024) commands[commandCount++] = (DrawCommand){x,y,w,h,pixels,texture_width,texture_height};
-    if (!uploadTexture(pixels, texture_width, texture_height)) return;
+    GX2Texture *texture = getTexture(pixels, texture_width, texture_height);
+    if (!texture) return;
     setQuad(x,y,w,h);
-    bindAndDraw();
+    bindAndDraw(texture);
 }
 
 void UtopiaRendererDrawSolid(int x, int y, int w, int h, uint32_t rgba) {
     static uint32_t solid;
     solid = rgba;
-    currentPixels = nullptr;
     UtopiaRendererDrawSprite(x,y,w,h,&solid,1,1);
 }
 
@@ -205,12 +217,12 @@ void UtopiaRendererEnd(void) {
     colorFloats(frameBackground,&r,&g,&b,&a);
     WHBGfxBeginRenderDRC();
     WHBGfxClearColor(r,g,b,a);
-    currentPixels = nullptr;
     for (unsigned int i = 0; i < commandCount; ++i) {
         DrawCommand *cmd = &commands[i];
-        if (!uploadTexture(cmd->pixels, cmd->tw, cmd->th)) continue;
+        GX2Texture *texture = getTexture(cmd->pixels, cmd->tw, cmd->th);
+        if (!texture) continue;
         setQuad(cmd->x,cmd->y,cmd->w,cmd->h);
-        bindAndDraw();
+        bindAndDraw(texture);
     }
     WHBGfxFinishRenderDRC();
     WHBGfxFinishRender();
