@@ -1,84 +1,40 @@
 #!/usr/bin/env python3
-"""Utopia Game Studio v1.95.001.005 - 2D/2.5D Wii U game creator."""
+"""Utopia Game Studio v1.95.001.006 - 2D/2.5D Wii U game creator."""
 import base64, json, shutil, struct, zlib
 from pathlib import Path
 import tkinter as tk
 from tkinter import colorchooser, filedialog, messagebox, simpledialog, ttk
 from blueprint_editor import BlueprintPanel, default_graph
 from game_framework import FrameworkPanel, GameRuntime, default_framework, ensure_framework
-from splash_part1 import SPLASH_PART_1
-from splash_part2 import SPLASH_PART_2
 
-APP_NAME, VERSION = "Utopia Game Studio", "1.95.001.005"
-DISPLAY_VERSION = "1.95-05"
+APP_NAME, VERSION = "Utopia Game Studio", "1.95.001.006"
+DISPLAY_VERSION = "1.95-06"
 ROOT = Path(__file__).resolve().parent
 TEMPLATE = ROOT / "runtime_template"
 ANIMATION_STATES=("idle_down","idle_left","idle_right","idle_up","walk_down","walk_left","walk_right","walk_up")
 
-def embedded_splash_photo(master):
- """Decode the embedded indexed PNG without relying on Tk's PNG decoder."""
- data=base64.b64decode(SPLASH_PART_1+SPLASH_PART_2)
- if data[:8]!=b"\x89PNG\r\n\x1a\n":raise ValueError("embedded splash is not a PNG")
- pos=8;width=height=None;palette=None;compressed=bytearray()
- while pos+12<=len(data):
-  length=struct.unpack(">I",data[pos:pos+4])[0];kind=data[pos+4:pos+8];payload=data[pos+8:pos+8+length];pos+=12+length
-  if kind==b"IHDR":
-   width,height,depth,color_type,_,_,_=struct.unpack(">IIBBBBB",payload)
-   if depth!=8 or color_type!=3:raise ValueError(f"unsupported embedded PNG format: depth={depth}, type={color_type}")
-  elif kind==b"PLTE":palette=[tuple(payload[i:i+3]) for i in range(0,len(payload),3)]
-  elif kind==b"IDAT":compressed.extend(payload)
-  elif kind==b"IEND":break
- if not width or not height or not palette:raise ValueError("embedded splash PNG is incomplete")
- raw=zlib.decompress(bytes(compressed));stride=width;rows=[];offset=0;previous=bytearray(stride)
- for _ in range(height):
-  filter_type=raw[offset];offset+=1;scan=bytearray(raw[offset:offset+stride]);offset+=stride
-  recon=bytearray(stride)
-  for x,value in enumerate(scan):
-   left=recon[x-1] if x else 0;up=previous[x];upper_left=previous[x-1] if x else 0
-   if filter_type==0:predictor=0
-   elif filter_type==1:predictor=left
-   elif filter_type==2:predictor=up
-   elif filter_type==3:predictor=(left+up)//2
-   elif filter_type==4:
-    p=left+up-upper_left;pa=abs(p-left);pb=abs(p-up);pc=abs(p-upper_left);predictor=left if pa<=pb and pa<=pc else (up if pb<=pc else upper_left)
-   else:raise ValueError(f"invalid PNG filter type {filter_type}")
-   recon[x]=(value+predictor)&255
-  rows.append(recon);previous=recon
- photo=tk.PhotoImage(master=master,width=width,height=height)
- for y,row in enumerate(rows):
-  colors="{"+" ".join("#%02x%02x%02x"%palette[index] for index in row)+"}"
-  photo.put(colors,to=(0,y))
- return photo
-
 def show_splash(duration_ms=3000):
- """Display the embedded Utopia editor splash for about three seconds."""
- splash=tk.Tk()
- splash.withdraw()
+ """Display the approved Utopia splash asset for about three seconds."""
+ splash_path=ROOT/"assets"/"utopia_splash.gif"
+ if not splash_path.exists():
+  messagebox.showwarning(APP_NAME,f"Splash screen asset is missing:\n{splash_path}")
+  return
+ splash=tk.Tk();splash.withdraw()
  try:
-  source=embedded_splash_photo(splash)
-  shown=source.zoom(2,2)
+  source=tk.PhotoImage(master=splash,file=str(splash_path),format="gif")
   splash._source_image=source
-  splash._shown_image=shown
-  splash.overrideredirect(True)
-  splash.configure(background="black")
-  tk.Label(splash,image=shown,borderwidth=0,highlightthickness=0).pack()
-  splash.update_idletasks()
-  width,height=shown.width(),shown.height()
-  x=max(0,(splash.winfo_screenwidth()-width)//2)
-  y=max(0,(splash.winfo_screenheight()-height)//2)
-  splash.geometry(f"{width}x{height}+{x}+{y}")
-  splash.deiconify()
-  splash.lift()
+  splash.overrideredirect(True);splash.configure(background="black")
+  tk.Label(splash,image=source,borderwidth=0,highlightthickness=0).pack()
+  splash.update_idletasks();width,height=source.width(),source.height()
+  x=max(0,(splash.winfo_screenwidth()-width)//2);y=max(0,(splash.winfo_screenheight()-height)//2)
+  splash.geometry(f"{width}x{height}+{x}+{y}");splash.deiconify();splash.lift()
   try:splash.attributes("-topmost",True)
   except tk.TclError:pass
-  splash.update()
-  splash.after(250,lambda:splash.attributes("-topmost",False))
-  splash.after(duration_ms,splash.destroy)
-  splash.mainloop()
- except Exception as e:
+  splash.update();splash.after(250,lambda:splash.attributes("-topmost",False));splash.after(duration_ms,splash.destroy);splash.mainloop()
+ except Exception as exc:
   try:splash.destroy()
   except tk.TclError:pass
-  messagebox.showwarning(APP_NAME,f"Splash screen could not be displayed:\n{e}")
+  messagebox.showwarning(APP_NAME,f"Splash screen could not be displayed:\n{exc}")
 
 DEFAULT = {"format":"utopia-project-8","title":"My Utopia RPG","author":"Homebrew Developer",
  "game_style":"2D / 2.5D RPG","background":"#18365c","player_color":"#f4d35e",
