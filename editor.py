@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Utopia Game Studio v1.95.001.003 - 2D/2.5D Wii U game creator."""
+"""Utopia Game Studio v1.95.001.004 - 2D/2.5D Wii U game creator."""
 import base64, json, shutil, struct, zlib
 from pathlib import Path
 import tkinter as tk
@@ -9,27 +9,42 @@ from game_framework import FrameworkPanel, GameRuntime, default_framework, ensur
 from splash_part1 import SPLASH_PART_1
 from splash_part2 import SPLASH_PART_2
 
-APP_NAME, VERSION = "Utopia Game Studio", "1.95.001.003"
+APP_NAME, VERSION = "Utopia Game Studio", "1.95.001.004"
+DISPLAY_VERSION = "1.95-04"
 ROOT = Path(__file__).resolve().parent
 TEMPLATE = ROOT / "runtime_template"
 ANIMATION_STATES=("idle_down","idle_left","idle_right","idle_up","walk_down","walk_left","walk_right","walk_up")
 
-def show_splash(duration_ms=1800):
- """Display the embedded Utopia editor splash before the main window opens."""
- splash=tk.Tk();splash.overrideredirect(True);splash.configure(background="black")
+def show_splash(duration_ms=3000):
+ """Display the embedded Utopia editor splash for about three seconds."""
+ splash=tk.Tk()
+ splash.withdraw()
  try:
-  source=tk.PhotoImage(data=SPLASH_PART_1+SPLASH_PART_2);shown=source.zoom(2,2)
-  splash._source_image=source;splash._shown_image=shown
+  source=tk.PhotoImage(master=splash,data=SPLASH_PART_1+SPLASH_PART_2,format="png")
+  shown=source.zoom(2,2)
+  splash._source_image=source
+  splash._shown_image=shown
+  splash.overrideredirect(True)
+  splash.configure(background="black")
   tk.Label(splash,image=shown,borderwidth=0,highlightthickness=0).pack()
-  splash.update_idletasks();width,height=shown.width(),shown.height()
-  x=max(0,(splash.winfo_screenwidth()-width)//2);y=max(0,(splash.winfo_screenheight()-height)//2)
-  splash.geometry(f"{width}x{height}+{x}+{y}");splash.lift()
+  splash.update_idletasks()
+  width,height=shown.width(),shown.height()
+  x=max(0,(splash.winfo_screenwidth()-width)//2)
+  y=max(0,(splash.winfo_screenheight()-height)//2)
+  splash.geometry(f"{width}x{height}+{x}+{y}")
+  splash.deiconify()
+  splash.lift()
   try:splash.attributes("-topmost",True)
   except tk.TclError:pass
-  splash.after(150,lambda:splash.attributes("-topmost",False))
-  splash.after(duration_ms,splash.destroy);splash.mainloop()
- except tk.TclError:
-  splash.destroy()
+  splash.update()
+  splash.after(250,lambda:splash.attributes("-topmost",False))
+  splash.after(duration_ms,splash.destroy)
+  splash.mainloop()
+ except Exception as e:
+  try:splash.destroy()
+  except tk.TclError:pass
+  messagebox.showwarning(APP_NAME,f"Splash screen could not be displayed:\n{e}")
+
 DEFAULT = {"format":"utopia-project-8","title":"My Utopia RPG","author":"Homebrew Developer",
  "game_style":"2D / 2.5D RPG","background":"#18365c","player_color":"#f4d35e",
  "player_x":560,"player_y":320,"player_width":80,"player_height":80,"player_speed":6,
@@ -262,7 +277,7 @@ class TestRunner(tk.Toplevel):
 
 class Editor(tk.Tk):
  def __init__(self):
-  super().__init__(); self.title(f"{APP_NAME} {VERSION}"); self.geometry("1120x750"); self.minsize(900,650)
+  super().__init__(); self.title(f"{APP_NAME} v{DISPLAY_VERSION}"); self.geometry("1120x750"); self.minsize(900,650)
   self.project=fresh(); self.project_path=None; self.photos={}; self.job=None; self.drag=None
   self.build_ui(); self.load_project()
 
