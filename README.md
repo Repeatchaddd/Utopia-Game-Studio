@@ -1,3 +1,12 @@
+# v1.95.001.005 — Tk-independent embedded splash decoder
+
+- Fixes the Windows/Tk splash failure reported as `invalid filter type 9`.
+- The approved embedded splash remains in Python source; no external image file is required.
+- Utopia now decodes the embedded indexed PNG itself and passes the finished pixels to Tk.
+- Splash remains visible for about 3 seconds before the editor opens.
+- Editor display version is **Utopia Game Studio v1.95-05**.
+- Full build version is **1.95.001.005**.
+
 # v1.95.001.004 — Splash startup fix
 
 - Startup splash is displayed for about 3 seconds before the editor opens.
