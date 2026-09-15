@@ -1,3 +1,11 @@
+# v1.95.001.004 — Splash startup fix
+
+- Startup splash is displayed for about 3 seconds before the editor opens.
+- Splash remains embedded in Python source; no external PNG/JPG file is required.
+- Splash errors are now reported instead of being silently hidden.
+- The editor window uses the compact visible version **Utopia Game Studio v1.95-04**.
+- Full engineering/build version remains **1.95.001.004**.
+
 # v1.95.001.003 — Embedded startup splash
 
 - The approved Utopia splash artwork is embedded directly in Python source.
