@@ -2,11 +2,13 @@
 import re
 import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
+from rpg_stats import ensure_stats, stat_names
 
 NODE_COLORS={
  "Start":"#6b4f8a","Update":"#8a4f6b","GamePad Input":"#315d83",
  "Move Character":"#3f7a55","Run Modifier":"#8a6335",
- "Set Variable":"#75558c","Change Variable":"#66519a","Compare Variable":"#8c5555"
+ "Set Variable":"#75558c","Change Variable":"#66519a","Compare Variable":"#8c5555",
+ "Set Stat":"#7a5b3f","Change Stat":"#8b643c","Set Max Stat":"#9a713f","Compare Stat":"#9a4f4f"
 }
 BUTTONS=("LEFT","RIGHT","UP","DOWN","A","B","X","Y")
 DIRECTIONS={"Left":(-1,0),"Right":(1,0),"Up":(0,-1),"Down":(0,1)}
@@ -63,6 +65,22 @@ class VariableManager(simpledialog.Dialog):
     for key in ("variable","speed_variable"):
      if p.get(key)==name:p[key]=""
    self.refresh()
+
+class StatActionDialog(simpledialog.Dialog):
+ def __init__(self,parent,title,props,names,compare=False):
+  self.props=props;self.names=names;self.compare=compare;self.result=None;super().__init__(parent,title)
+ def body(self,parent):
+  ttk.Label(parent,text="Stat").grid(row=0,column=0,sticky="w",pady=5);self.name=tk.StringVar(value=self.props.get("stat",self.names[0] if self.names else ""))
+  ttk.Combobox(parent,textvariable=self.name,values=self.names,state="readonly",width=18).grid(row=0,column=1,padx=(8,0),pady=5);row=1
+  if self.compare:
+   ttk.Label(parent,text="Comparison").grid(row=row,column=0,sticky="w",pady=5);self.op=tk.StringVar(value=self.props.get("op","=="));ttk.Combobox(parent,textvariable=self.op,values=COMPARE_OPS,state="readonly",width=8).grid(row=row,column=1,sticky="w",padx=(8,0),pady=5);row+=1
+  ttk.Label(parent,text="Value").grid(row=row,column=0,sticky="w",pady=5);self.value=tk.StringVar(value=str(self.props.get("value",0)));entry=ttk.Entry(parent,textvariable=self.value,width=12);entry.grid(row=row,column=1,sticky="w",padx=(8,0),pady=5);return entry
+ def validate(self):
+  if not self.name.get():messagebox.showerror("Utopia Game Studio","Create an RPG stat first.",parent=self);return False
+  try:int(self.value.get())
+  except ValueError:messagebox.showerror("Utopia Game Studio","Stat values must be whole numbers.",parent=self);return False
+  return True
+ def apply(self):self.result=(self.name.get(),int(self.value.get()),self.op.get() if self.compare else None)
 
 class MovePropertiesDialog(simpledialog.Dialog):
  def __init__(self,parent,props,var_names):self.props=props;self.var_names=var_names;self.result=None;super().__init__(parent,"Move Character")
@@ -166,6 +184,10 @@ class BlueprintPanel(ttk.Frame):
   elif n["type"]=="Set Variable":detail=f"{p.get('variable','?')} = {p.get('value',0)}"
   elif n["type"]=="Change Variable":detail=f"{p.get('variable','?')} += {p.get('value',0)}"
   elif n["type"]=="Compare Variable":detail=f"{p.get('variable','?')} {p.get('op','==')} {p.get('value',0)}"
+  elif n["type"]=="Set Stat":detail=f"{p.get('stat','?')} = {p.get('value',0)}"
+  elif n["type"]=="Change Stat":detail=f"{p.get('stat','?')} += {p.get('value',0)}"
+  elif n["type"]=="Set Max Stat":detail=f"Max {p.get('stat','?')} = {p.get('value',0)}"
+  elif n["type"]=="Compare Stat":detail=f"{p.get('stat','?')} {p.get('op','==')} {p.get('value',0)}"
   else:detail="Execution event"
   self.canvas.create_text(x+10,y+51,text=detail,anchor="w",fill="#d7dce2",tags=(tag,"node"))
  def event_node(self,e):
@@ -202,6 +224,8 @@ class BlueprintPanel(ttk.Frame):
   elif kind=="Run Modifier":props={"speed_percent":175,"speed_variable":""}
   elif kind in ("Set Variable","Change Variable"):props={"variable":"","value":0}
   elif kind=="Compare Variable":props={"variable":"","op":"==","value":0}
+  elif kind in ("Set Stat","Change Stat","Set Max Stat"):props={"stat":"","value":0}
+  elif kind=="Compare Stat":props={"stat":"","op":"==","value":0}
   ident=g["next_id"];g["next_id"]+=1;g["nodes"].append({"id":ident,"type":kind,"x":80+len(g["nodes"])*25,"y":80+len(g["nodes"])*20,"props":props});self.selected=ident;self.refresh()
  def begin_link(self):
   if self.selected is None:messagebox.showinfo("Utopia Game Studio","Select the source node first.");return
@@ -226,6 +250,11 @@ class BlueprintPanel(ttk.Frame):
    if d.result:
     name,value,op=d.result;n["props"].update(variable=name,value=value)
     if op is not None:n["props"]["op"]=op
+  elif n["type"] in ("Set Stat","Change Stat","Set Max Stat","Compare Stat"):
+   d=StatActionDialog(self,n["type"],n["props"],stat_names(self.get_project()),n["type"]=="Compare Stat")
+   if d.result:
+    name,value,op=d.result;n["props"].update(stat=name,value=value)
+    if op is not None:n["props"]["op"]=op
   self.refresh()
  def delete_node(self):
   if self.selected is None:return
@@ -241,26 +270,34 @@ class BlueprintPanel(ttk.Frame):
  def compiled_config(self):
   p=self.get_project();g=self.graph();lookup={n["id"]:n for n in g["nodes"]};outs={}
   for l in g["links"]:outs.setdefault(l["from"],[]).append(l["to"])
-  cfg={"variables":{v["name"]:int(v.get("value",0)) for v in variables(p)},"actions":[]}
+  cfg={"variables":{v["name"]:int(v.get("value",0)) for v in variables(p)},"stats":{s["name"]:{"current":int(s["current"]),"minimum":int(s["minimum"]),"maximum":int(s["maximum"])} for s in ensure_stats(p)},"actions":[]}
   def walk(node_id,source,button=None,gates=None,path=None):
    gates=list(gates or []);path=set(path or ())
    if node_id in path:return
    path.add(node_id);node=lookup.get(node_id)
    if not node:return
    t=node["type"];pr=node.get("props",{})
-   if t=="Compare Variable":
+   if t=="Compare Stat":
+    name=pr.get("stat","")
+    if name not in cfg["stats"]:return
+    gates.append({"stat":name,"op":pr.get("op","=="),"value":int(pr.get("value",0))})
+   elif t=="Compare Variable":
     name=pr.get("variable","")
     if name not in cfg["variables"]:return
     gates.append({"variable":name,"op":pr.get("op","=="),"value":int(pr.get("value",0))})
-   elif t in ("Move Character","Run Modifier","Set Variable","Change Variable"):
+   elif t in ("Move Character","Run Modifier","Set Variable","Change Variable","Set Stat","Change Stat","Set Max Stat"):
     action={"type":t,"source":source,"button":button,"gates":list(gates)}
     if t=="Move Character":
      action.update(dx=int(pr.get("dx",0)),dy=int(pr.get("dy",0)),speed=max(1,min(400,int(pr.get("speed_percent",100)))),speed_variable=pr.get("speed_variable","") if pr.get("speed_variable","") in cfg["variables"] else "")
     elif t=="Run Modifier":
      action.update(speed=max(101,min(400,int(pr.get("speed_percent",175)))),speed_variable=pr.get("speed_variable","") if pr.get("speed_variable","") in cfg["variables"] else "")
-    else:
+    elif t in ("Set Variable","Change Variable"):
      name=pr.get("variable","")
      if name in cfg["variables"]:action.update(variable=name,value=int(pr.get("value",0)));cfg["actions"].append(action)
+     action=None
+    else:
+     name=pr.get("stat","")
+     if name in cfg["stats"]:action.update(stat=name,value=int(pr.get("value",0)));cfg["actions"].append(action)
      action=None
     if action is not None:cfg["actions"].append(action)
    for child in outs.get(node_id,[]):walk(child,source,button,gates,path)
@@ -276,17 +313,23 @@ class BlueprintPanel(ttk.Frame):
   return cfg
  def movement_config(self):return self.compiled_config()
  def write_header(self,path):
-  cfg=self.compiled_config();names=list(cfg["variables"]);index={n:i for i,n in enumerate(names)}
+  cfg=self.compiled_config();names=list(cfg["variables"]);index={n:i for i,n in enumerate(names)};statnames=list(cfg["stats"]);statindex={n:i for i,n in enumerate(statnames)}
   init=", ".join(str(cfg["variables"][n]) for n in names) or "0"
-  lines=["#pragma once","#include <stdint.h>",f"#define BP_VAR_COUNT {len(names)}",f"static int bp_vars[{max(1,len(names))}] = {{{init}}};"]
+  stat_init=", ".join(str(cfg["stats"][n]["current"]) for n in statnames) or "0";stat_min=", ".join(str(cfg["stats"][n]["minimum"]) for n in statnames) or "0";stat_max=", ".join(str(cfg["stats"][n]["maximum"]) for n in statnames) or "0"
+  lines=["#pragma once","#include <stdint.h>",f"#define BP_VAR_COUNT {len(names)}",f"static int bp_vars[{max(1,len(names))}] = {{{init}}};",f"#define RPG_STAT_COUNT {len(statnames)}",f"static int rpg_stats[{max(1,len(statnames))}] = {{{stat_init}}};",f"static int rpg_stat_min[{max(1,len(statnames))}] = {{{stat_min}}};",f"static int rpg_stat_max[{max(1,len(statnames))}] = {{{stat_max}}};"]
   for n,i in index.items():lines.append(f"#define BP_VAR_{clean_name(n).upper()} {i}")
+  for n,i in statindex.items():lines.append(f"#define RPG_STAT_{clean_name(n).upper()} {i}")
   lines += [
    "static inline int bp_compare_value(int left,int op,int right){switch(op){case 0:return left==right;case 1:return left!=right;case 2:return left<right;case 3:return left<=right;case 4:return left>right;case 5:return left>=right;default:return 1;}}",
    "static inline int bp_gate(int idx,int op,int value){return idx<0?1:bp_compare_value(bp_vars[idx],op,value);}",
-   "static inline int bp_speed_percent(int idx,int fallback,int lo,int hi){int value=idx>=0?bp_vars[idx]:fallback;if(value<lo)value=lo;if(value>hi)value=hi;return value;}"
+   "static inline int bp_speed_percent(int idx,int fallback,int lo,int hi){int value=idx>=0?bp_vars[idx]:fallback;if(value<lo)value=lo;if(value>hi)value=hi;return value;}",
+   "static inline void rpg_clamp(int idx){if(idx<0)return;if(rpg_stats[idx]<rpg_stat_min[idx])rpg_stats[idx]=rpg_stat_min[idx];if(rpg_stats[idx]>rpg_stat_max[idx])rpg_stats[idx]=rpg_stat_max[idx];}"
   ]
   def gate_expr(action):
-   parts=[f"bp_gate({index.get(g['variable'],-1)},{OP_CODES.get(g['op'],0)},{int(g['value'])})" for g in action.get("gates",[])]
+   parts=[]
+   for g in action.get("gates",[]):
+    if "stat" in g:parts.append(f"bp_compare_value(rpg_stats[{statindex.get(g['stat'],-1)}],{OP_CODES.get(g['op'],0)},{int(g['value'])})")
+    else:parts.append(f"bp_gate({index.get(g['variable'],-1)},{OP_CODES.get(g['op'],0)},{int(g['value'])})")
    return " && ".join(parts) if parts else "1"
   def source_expr(action,trigger=False):
    source=action["source"]
@@ -296,9 +339,15 @@ class BlueprintPanel(ttk.Frame):
    return f"({'trigger' if trigger else 'hold'} & VPAD_BUTTON_{button})"
   lines.append("static inline void BPApplyFrameActions(uint32_t trigger,int first_frame){")
   for a in cfg["actions"]:
-   if a["type"] not in ("Set Variable","Change Variable"):continue
-   cond=f"({source_expr(a,True)}) && ({gate_expr(a)})";idx=index[a["variable"]];op="=" if a["type"]=="Set Variable" else "+="
-   lines.append(f" if({cond}) bp_vars[{idx}] {op} {int(a['value'])};")
+   if a["type"] not in ("Set Variable","Change Variable","Set Stat","Change Stat","Set Max Stat"):continue
+   cond=f"({source_expr(a,True)}) && ({gate_expr(a)})"
+   if a["type"] in ("Set Variable","Change Variable"):
+    idx=index[a["variable"]];op="=" if a["type"]=="Set Variable" else "+=";lines.append(f" if({cond}) bp_vars[{idx}] {op} {int(a['value'])};")
+   else:
+    idx=statindex[a["stat"]]
+    if a["type"]=="Set Max Stat":lines.append(f" if({cond}){{rpg_stat_max[{idx}]={int(a['value'])};if(rpg_stat_max[{idx}]<rpg_stat_min[{idx}])rpg_stat_max[{idx}]=rpg_stat_min[{idx}];rpg_clamp({idx});}}")
+    else:
+     op="=" if a["type"]=="Set Stat" else "+=";lines.append(f" if({cond}){{rpg_stats[{idx}] {op} {int(a['value'])};rpg_clamp({idx});}}")
   lines.append("}")
   lines.append("static inline void BPCollectMovement(uint32_t hold,int first_frame,int *move_x100,int *move_y100,int *run_percent){")
   lines.append(" *move_x100=0; *move_y100=0; *run_percent=100;")
