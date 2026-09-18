@@ -4,12 +4,14 @@ import re
 import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
 from rpg_stats import ensure_stats, stat_names
+from inventory_system import SLOTS, item_names
 
 NODE_COLORS={
  "Start":"#6b4f8a","Update":"#8a4f6b","GamePad Input":"#315d83",
  "Move Character":"#3f7a55","Run Modifier":"#8a6335",
  "Set Variable":"#75558c","Change Variable":"#66519a","Compare Variable":"#8c5555",
- "Set Stat":"#7a5b3f","Change Stat":"#8b643c","Set Max Stat":"#9a713f","Compare Stat":"#9a4f4f"
+ "Set Stat":"#7a5b3f","Change Stat":"#8b643c","Set Max Stat":"#9a713f","Compare Stat":"#9a4f4f",
+ "Add Item":"#527a68","Remove Item":"#7a5252","Has Item":"#6b6f8a","Equip Item":"#526f7a","Unequip Slot":"#7a6b52"
 }
 BUTTONS=("LEFT","RIGHT","UP","DOWN","A","B","X","Y")
 DIRECTIONS={"Left":(-1,0),"Right":(1,0),"Up":(0,-1),"Down":(0,1)}
@@ -195,6 +197,9 @@ class BlueprintPanel(ttk.Frame):
   elif n["type"]=="Change Stat":detail=f"{p.get('stat','?')} += {p.get('value',0)}"
   elif n["type"]=="Set Max Stat":detail=f"Max {p.get('stat','?')} = {p.get('value',0)}"
   elif n["type"]=="Compare Stat":detail=f"{p.get('stat','?')} {p.get('op','==')} {p.get('value',0)}"
+  elif n["type"] in ("Add Item","Remove Item","Has Item"):detail=f"{p.get('item','?')} x{p.get('quantity',1)}"
+  elif n["type"]=="Equip Item":detail=f"{p.get('item','?')} -> {p.get('slot','?')}"
+  elif n["type"]=="Unequip Slot":detail=f"Slot: {p.get('slot','?')}"
   else:detail="Execution event"
   self.canvas.create_text(x+10,y+51,text=detail,anchor="w",fill="#d7dce2",tags=(tag,"node"))
  def event_node(self,e):
@@ -233,6 +238,9 @@ class BlueprintPanel(ttk.Frame):
   elif kind=="Compare Variable":props={"variable":"","op":"==","value":0}
   elif kind in ("Set Stat","Change Stat","Set Max Stat"):props={"stat":"","value":0}
   elif kind=="Compare Stat":props={"stat":"","op":"==","value":0}
+  elif kind in ("Add Item","Remove Item","Has Item"):props={"item":"","quantity":1}
+  elif kind=="Equip Item":props={"item":"","slot":"Main Hand"}
+  elif kind=="Unequip Slot":props={"slot":"Main Hand"}
   ident=g["next_id"];g["next_id"]+=1;g["nodes"].append({"id":ident,"type":kind,"x":80+len(g["nodes"])*25,"y":80+len(g["nodes"])*20,"props":props});self.selected=ident;self.refresh()
  def begin_link(self):
   if self.selected is None:messagebox.showinfo("Utopia Game Studio","Select the source node first.");return
@@ -257,6 +265,14 @@ class BlueprintPanel(ttk.Frame):
    if d.result:
     name,value,op=d.result;n["props"].update(variable=name,value=value)
     if op is not None:n["props"]["op"]=op
+  elif n["type"] in ("Add Item","Remove Item","Has Item","Equip Item"):
+   names=item_names(self.get_project());name=simpledialog.askstring(n["type"],"Item:\n"+", ".join(names),initialvalue=n["props"].get("item",names[0] if names else ""),parent=self)
+   if name in names:
+    n["props"]["item"]=name
+    if n["type"] in ("Add Item","Remove Item","Has Item"):n["props"]["quantity"]=simpledialog.askinteger(n["type"],"Quantity:",initialvalue=n["props"].get("quantity",1),minvalue=1,parent=self) or 1
+    elif n["type"]=="Equip Item":n["props"]["slot"]=simpledialog.askstring("Equip Item","Slot:\n"+", ".join(SLOTS),initialvalue=n["props"].get("slot","Main Hand"),parent=self) or "Main Hand"
+  elif n["type"]=="Unequip Slot":
+   n["props"]["slot"]=simpledialog.askstring("Unequip Slot","Slot:\n"+", ".join(SLOTS),initialvalue=n["props"].get("slot","Main Hand"),parent=self) or "Main Hand"
   elif n["type"] in ("Set Stat","Change Stat","Set Max Stat","Compare Stat"):
    d=StatActionDialog(self,n["type"],n["props"],stat_names(self.get_project()),n["type"]=="Compare Stat")
    if d.result:
