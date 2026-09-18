@@ -33,7 +33,16 @@ class InventoryPanel(ttk.Frame):
   if stack is None:return None
   raw=simpledialog.askstring("Item","Allowed equipment slots (comma separated; blank for bag-only):\n"+", ".join(SLOTS),initialvalue=", ".join(item.get("equip_slots",[])),parent=self) or ""
   slots=[x.strip() for x in raw.split(",") if x.strip() in SLOTS]
-  return {"name":name.strip()[:48],"type":typ,"max_stack":stack,"equip_slots":slots,"description":item.get("description",""),"stats":dict(item.get("stats",{}))}
+  statraw=simpledialog.askstring("Item Stat Modifiers","Equipment bonuses as Stat=Value, comma separated.\nExamples: Attack=10, Defense=5, Mana=20",initialvalue=", ".join(f"{k}={v}" for k,v in item.get("stats",{}).items()),parent=self) or ""
+  stats={}
+  for part in statraw.split(","):
+   if "=" not in part:continue
+   k,v=part.split("=",1);k=k.strip()
+   try:
+    if k:stats[k]=int(v.strip())
+   except ValueError:pass
+  desc=simpledialog.askstring("Item Description","Description:",initialvalue=item.get("description",""),parent=self) or ""
+  return {"name":name.strip()[:48],"type":typ,"max_stack":stack,"equip_slots":slots,"description":desc,"stats":stats}
  def add_item(self):
   x=self.item_dialog()
   if not x:return
