@@ -5,7 +5,9 @@ from tkinter import messagebox, simpledialog, ttk
 def default_dialogue():return {"conversations":[]}
 def ensure_dialogue(project):
  d=project.setdefault("dialogue",default_dialogue());d.setdefault("conversations",[])
- for c in d["conversations"]:c.setdefault("pages",[])
+ for c in d["conversations"]:
+  c.setdefault("pages",[])
+  for p in c["pages"]:p.setdefault("choices",[])
  return d
 def conversation_names(project):return [c["name"] for c in ensure_dialogue(project)["conversations"]]
 def find_conversation(project,name):return next((c for c in ensure_dialogue(project)["conversations"] if c["name"]==name),None)
@@ -58,9 +60,18 @@ class DialoguePanel(ttk.Frame):
   d=tk.Toplevel(self);d.title("Dialogue Page");d.transient(self.winfo_toplevel());d.grab_set()
   ttk.Label(d,text="Speaker").grid(row=0,column=0,sticky="w",padx=8,pady=8);sv=tk.StringVar(value=(page or {}).get("speaker",""));ttk.Entry(d,textvariable=sv,width=32).grid(row=0,column=1,padx=8,pady=8)
   ttk.Label(d,text="Text").grid(row=1,column=0,sticky="nw",padx=8);txt=tk.Text(d,width=60,height=10,wrap="word");txt.grid(row=1,column=1,padx=8,pady=8);txt.insert("1.0",(page or {}).get("text",""))
+  ttk.Label(d,text="Choices").grid(row=2,column=0,sticky="nw",padx=8);choices=tk.Text(d,width=60,height=5,wrap="none");choices.grid(row=2,column=1,padx=8,pady=8)
+  choices.insert("1.0","\n".join(f"{x.get('text','')} => {x.get('conversation','')}" for x in (page or {}).get("choices",[])))
+  ttk.Label(d,text="One per line: Choice text => Conversation name\nLeave destination blank to end dialogue.").grid(row=3,column=1,sticky="w",padx=8)
   result={}
-  def ok():result.update(speaker=sv.get().strip(),text=txt.get("1.0","end-1c").strip());d.destroy()
-  ttk.Button(d,text="OK",command=ok).grid(row=2,column=1,sticky="e",padx=8,pady=8);d.wait_window();return result or None
+  def ok():
+   parsed=[]
+   for line in choices.get("1.0","end-1c").splitlines():
+    if not line.strip():continue
+    left,sep,right=line.partition("=>");label=left.strip();dest=right.strip() if sep else ""
+    if label:parsed.append({"text":label,"conversation":dest})
+   result.update(speaker=sv.get().strip(),text=txt.get("1.0","end-1c").strip(),choices=parsed);d.destroy()
+  ttk.Button(d,text="OK",command=ok).grid(row=4,column=1,sticky="e",padx=8,pady=8);d.wait_window();return result or None
  def add_page(self):
   c=self.selected_conv()
   if not c:return
