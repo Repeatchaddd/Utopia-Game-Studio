@@ -1,7 +1,7 @@
-# Utopia Game Studio v1.95.003.003
+# Utopia Game Studio v1.95.004.000
 
 **Current development stage:** 1.95  
-**Build:** 1.95.003.003
+**Build:** 1.95.004.000
 
 ## v1.95.002.000 — RPG Stat System
 
@@ -260,3 +260,13 @@ Utopia Game Studio is not affiliated with or endorsed by Nintendo, Epic Games, o
 - Added Add Item as a general Game Framework object-event action.
 - Objects can now award configured inventory items and quantities from editor-created events such as Collision with Player.
 - Add Item can be combined with Destroy Self to build collectible/pickup objects entirely through editor functions.
+
+
+### v1.95.004.000 — General Object Interaction System
+- Added Interact as a first-class Game Framework object event alongside Game Start, Room Start, Update, and Collision.
+- Each object has an editable interaction range (72 pixels by default).
+- Test Run maps E to Interact and searches nearby active objects with Interact events.
+- If multiple interactable objects are in range, the nearest object receives the event.
+- Interact events execute the same editor-created action list as other object events, so they can change variables, add inventory items, hide/destroy objects, move objects, or change rooms.
+- Existing projects automatically receive the default interaction range without migration work.
+- This provides the editor-level foundation for NPC conversations, doors, switches, treasure chests, shops, save points, and other RPG interactions.
