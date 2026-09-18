@@ -1,7 +1,7 @@
-# Utopia Game Studio v1.95.006.004
+# Utopia Game Studio v1.95.006.005
 
 **Current development stage:** 1.95  
-**Build:** 1.95.006.004
+**Build:** 1.95.006.005
 
 ## v1.95.002.000 — RPG Stat System
 
@@ -328,3 +328,9 @@ Utopia Game Studio is not affiliated with or endorsed by Nintendo, Epic Games, o
 - Fixed Blueprint traversal through Has Item conditions.
 - Conditional inventory chains now continue once with the item requirement attached, rather than also compiling an unconditioned duplicate path.
 - Fixes the quest test Equip Sword chain: Equip Sword now executes only when Training Sword is present and updates the equipped Main Hand slot.
+
+
+### v1.95.006.005 — Equipment Slot Compatibility Fix
+- Fixed older/test project item definitions that stored allowed equipment slots under `slots` instead of the current `equip_slots` field.
+- Inventory loading now migrates legacy `slots` data into `equip_slots` automatically.
+- Fixes Training Sword in The Crystal Errand: the item is now recognized as valid for Main Hand and can be equipped without rebuilding the test project.
