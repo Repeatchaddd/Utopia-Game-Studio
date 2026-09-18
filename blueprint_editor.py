@@ -1,4 +1,5 @@
 """Original node-based visual scripting panel for Utopia Game Studio."""
+import copy
 import re
 import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
@@ -149,7 +150,7 @@ def default_graph():
 
 class BlueprintPanel(ttk.Frame):
  def __init__(self,parent,project_getter,status):
-  super().__init__(parent);self.get_project=project_getter;self.status=status;self.selected=None;self.selected_link=None;self.link_from=None;self.drag=None
+  super().__init__(parent);self.get_project=project_getter;self.status=status;self.selected=None;self.selected_link=None;self.link_from=None;self.drag=None;self.node_clipboard=None
   tools=ttk.Frame(self,padding=6);tools.pack(fill="x")
   self.kind=tk.StringVar(value="GamePad Input");ttk.Combobox(tools,textvariable=self.kind,state="readonly",values=list(NODE_COLORS),width=18).pack(side="left")
   ttk.Button(tools,text="Add Node",command=self.add_node).pack(side="left",padx=4)
@@ -158,10 +159,14 @@ class BlueprintPanel(ttk.Frame):
   ttk.Button(tools,text="Edit Properties",command=self.edit_node).pack(side="left",padx=4)
   ttk.Button(tools,text="Delete",command=self.delete_node).pack(side="left",padx=4)
   ttk.Button(tools,text="Delete Link",command=self.delete_link).pack(side="left",padx=4)
+  ttk.Button(tools,text="Cut",command=self.cut_node).pack(side="left",padx=4)
+  ttk.Button(tools,text="Copy",command=self.copy_node).pack(side="left",padx=4)
+  ttk.Button(tools,text="Paste",command=self.paste_node).pack(side="left",padx=4)
   self.canvas=tk.Canvas(self,background="#20242b",scrollregion=(0,0,1900,1200),highlightthickness=0)
   xs=ttk.Scrollbar(self,orient="horizontal",command=self.canvas.xview);ys=ttk.Scrollbar(self,orient="vertical",command=self.canvas.yview)
   self.canvas.configure(xscrollcommand=xs.set,yscrollcommand=ys.set);self.canvas.pack(fill="both",expand=True,side="left");ys.pack(fill="y",side="right");xs.pack(fill="x",side="bottom")
   self.canvas.bind("<Button-1>",self.click);self.canvas.bind("<B1-Motion>",self.move);self.canvas.bind("<ButtonRelease-1>",lambda _e:setattr(self,"drag",None));self.canvas.bind("<Double-Button-1>",lambda _e:self.edit_node())
+  self.bind_all("<Delete>",self._key_delete,add="+");self.bind_all("<Control-x>",self._key_cut,add="+");self.bind_all("<Control-X>",self._key_cut,add="+");self.bind_all("<Control-c>",self._key_copy,add="+");self.bind_all("<Control-C>",self._key_copy,add="+");self.bind_all("<Control-v>",self._key_paste,add="+");self.bind_all("<Control-V>",self._key_paste,add="+")
  def graph(self):
   p=self.get_project();p.setdefault("blueprint",default_graph());p.setdefault("variables",[]);return p["blueprint"]
  def node(self,ident):return next((n for n in self.graph()["nodes"] if n["id"]==ident),None)
@@ -258,9 +263,35 @@ class BlueprintPanel(ttk.Frame):
     name,value,op=d.result;n["props"].update(stat=name,value=value)
     if op is not None:n["props"]["op"]=op
   self.refresh()
+ def _blueprint_has_focus(self):
+  w=self.focus_get()
+  while w is not None:
+   if w is self:return True
+   w=getattr(w,"master",None)
+  return False
+ def _key_delete(self,_e):
+  if self._blueprint_has_focus():self.delete_node();return "break"
+ def _key_cut(self,_e):
+  if self._blueprint_has_focus():self.cut_node();return "break"
+ def _key_copy(self,_e):
+  if self._blueprint_has_focus():self.copy_node();return "break"
+ def _key_paste(self,_e):
+  if self._blueprint_has_focus():self.paste_node();return "break"
+ def copy_node(self):
+  n=self.node(self.selected)
+  if not n:return
+  self.node_clipboard=copy.deepcopy(n);self.status.set(f"Copied Blueprint node: {n['type']}")
+ def cut_node(self):
+  n=self.node(self.selected)
+  if not n:return
+  self.node_clipboard=copy.deepcopy(n);kind=n["type"];self.delete_node();self.status.set(f"Cut Blueprint node: {kind}")
+ def paste_node(self):
+  if not self.node_clipboard:return
+  g=self.graph();n=copy.deepcopy(self.node_clipboard);n["id"]=g["next_id"];g["next_id"]+=1;n["x"]=max(0,int(n.get("x",80))+24);n["y"]=max(0,int(n.get("y",80))+24)
+  g["nodes"].append(n);self.node_clipboard=copy.deepcopy(n);self.selected=n["id"];self.selected_link=None;self.link_from=None;self.refresh();self.status.set(f"Pasted Blueprint node: {n['type']}")
  def delete_node(self):
   if self.selected is None:return
-  g=self.graph();g["nodes"]=[n for n in g["nodes"] if n["id"]!=self.selected];g["links"]=[x for x in g["links"] if self.selected not in (x["from"],x["to"])];self.selected=None;self.selected_link=None;self.refresh()
+  g=self.graph();g["nodes"]=[n for n in g["nodes"] if n["id"]!=self.selected];g["links"]=[x for x in g["links"] if self.selected not in (x["from"],x["to"])];self.selected=None;self.selected_link=None;self.link_from=None;self.refresh();self.status.set("Blueprint node deleted")
  def delete_link(self):
   g=self.graph()
   if self.selected_link is None or not (0<=self.selected_link<len(g["links"])):
