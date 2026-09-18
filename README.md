@@ -1,7 +1,7 @@
-# Utopia Game Studio v1.95.006.002
+# Utopia Game Studio v1.95.006.003
 
 **Current development stage:** 1.95  
-**Build:** 1.95.006.002
+**Build:** 1.95.006.003
 
 ## v1.95.002.000 — RPG Stat System
 
@@ -315,3 +315,10 @@ Utopia Game Studio is not affiliated with or endorsed by Nintendo, Epic Games, o
 - Inventory and Dialogue panels now also refresh when a project is loaded, preventing stale UI from the previously open project.
 - Open now explicitly ensures Controls, Inventory, Dialogue, RPG Stats, and Game Framework data before refreshing the editor.
 - A project with no Controls actions now has no gameplay keyboard movement/actions in Test Run.
+
+
+### v1.95.006.003 — Non-Movement Input Action Fix
+- Fixed Blueprint compilation for Interact and Toggle Inventory actions.
+- These actions were being incorrectly routed through the RPG-stat compilation branch and discarded, while Move Character used a separate path and continued to work.
+- Project-defined Interact and Inventory inputs now remain in the compiled Test Run action list.
+- Dialogue choice selection resets when a new conversation is opened.
