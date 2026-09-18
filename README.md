@@ -1,7 +1,7 @@
-# Utopia Game Studio v1.95.006.003
+# Utopia Game Studio v1.95.006.004
 
 **Current development stage:** 1.95  
-**Build:** 1.95.006.003
+**Build:** 1.95.006.004
 
 ## v1.95.002.000 — RPG Stat System
 
@@ -322,3 +322,9 @@ Utopia Game Studio is not affiliated with or endorsed by Nintendo, Epic Games, o
 - These actions were being incorrectly routed through the RPG-stat compilation branch and discarded, while Move Character used a separate path and continued to work.
 - Project-defined Interact and Inventory inputs now remain in the compiled Test Run action list.
 - Dialogue choice selection resets when a new conversation is opened.
+
+
+### v1.95.006.004 — Has Item Gate Fix
+- Fixed Blueprint traversal through Has Item conditions.
+- Conditional inventory chains now continue once with the item requirement attached, rather than also compiling an unconditioned duplicate path.
+- Fixes the quest test Equip Sword chain: Equip Sword now executes only when Training Sword is present and updates the equipped Main Hand slot.
