@@ -141,7 +141,13 @@ class TestRunner(tk.Toplevel):
   return self.BUTTON_KEYS.get(name,"") in self.pressed
  def compare(self,left,op,right):
   return {"==":left==right,"!=":left!=right,"<":left<right,"<=":left<=right,">":left>right,">=":left>=right}.get(op,True)
+ def sync_preset_variables(self):
+  self.bp_vars["Player.X"]=int(self.x);self.bp_vars["Player.Y"]=int(self.y);self.bp_vars["Player.Visible"]=int(self.bp_vars.get("Player.Visible",1)!=0);self.bp_vars["Player.Active"]=int(self.bp_vars.get("Player.Active",1)!=0)
+  self.bp_vars["Player.Width"]=int(self.project.get("player_width",48));self.bp_vars["Player.Height"]=int(self.project.get("player_height",48));self.bp_vars["Player.Solid"]=int(self.bp_vars.get("Player.Solid",1)!=0)
+ def apply_preset_variables(self):
+  self.x=float(self.bp_vars.get("Player.X",self.x));self.y=float(self.bp_vars.get("Player.Y",self.y))
  def gates_ok(self,action):
+  self.sync_preset_variables()
   return all(self.compare((self.rpg_stats.get(g["stat"],{}).get("current",0) if "stat" in g else self.bp_vars.get(g["variable"],0)),g.get("op","=="),int(g.get("value",0))) for g in action.get("gates",[]))
  def action_speed(self,action,lo,hi):
   value=self.bp_vars.get(action.get("speed_variable",""),action.get("speed",100))
@@ -152,6 +158,7 @@ class TestRunner(tk.Toplevel):
   if name not in self.bp_vars:return
   if action["type"]=="Set Variable":self.bp_vars[name]=value
   else:self.bp_vars[name]=self.bp_vars.get(name,0)+value
+  if name.startswith("Player."):self.apply_preset_variables()
  def apply_stat_action(self,action):
   if not self.gates_ok(action):return
   name=action.get("stat","");s=self.rpg_stats.get(name)
