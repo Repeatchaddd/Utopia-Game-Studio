@@ -1,7 +1,7 @@
-# Utopia Game Studio v1.95.006.001
+# Utopia Game Studio v1.95.006.002
 
 **Current development stage:** 1.95  
-**Build:** 1.95.006.001
+**Build:** 1.95.006.002
 
 ## v1.95.002.000 — RPG Stat System
 
@@ -306,3 +306,12 @@ Utopia Game Studio is not affiliated with or endorsed by Nintendo, Epic Games, o
 - Test Run displays choices beneath dialogue text and supports selection/branching.
 - Choice navigation is currently a Test Run viewer function (Up/Down and Enter); gameplay control mapping remains separate from editor-defined project controls.
 - Branch destinations use conversation names, keeping dialogue reusable across NPCs and object events.
+
+
+### v1.95.006.002 — Input Cleanup and Project Panel Refresh
+- Removed the remaining legacy hard-coded TestRunner keyboard/gamepad maps.
+- Gameplay input now comes only from project-defined Controls actions.
+- Fixed project loading so the Controls panel refreshes after a .ugs project is opened.
+- Inventory and Dialogue panels now also refresh when a project is loaded, preventing stale UI from the previously open project.
+- Open now explicitly ensures Controls, Inventory, Dialogue, RPG Stats, and Game Framework data before refreshing the editor.
+- A project with no Controls actions now has no gameplay keyboard movement/actions in Test Run.
