@@ -1,7 +1,7 @@
-# Utopia Game Studio v1.95.002.000
+# Utopia Game Studio v1.95.002.002
 
 **Current development stage:** 1.95  
-**Build:** 1.95.002.000
+**Build:** 1.95.002.002
 
 ## v1.95.002.000 — RPG Stat System
 
@@ -203,3 +203,11 @@ Utopia Game Studio is not affiliated with or endorsed by Nintendo, Epic Games, o
 - Set Variable / Change Variable object actions now use a read-only dropdown instead of requiring a typed variable name.
 - Variable dropdown includes the selected object's Self.* variables plus existing project/global variables.
 - Test Run resolves Self.* variables against the active object instance, so position/state/custom values are functional rather than editor-only.
+
+
+### v1.95.002.002
+- Blueprint variable dropdowns now include preset Player variables: Player.X, Player.Y, Player.Visible, Player.Active, Player.Width, Player.Height, and Player.Solid.
+- The unified list is used by Set Variable, Change Variable, Compare Variable, Move Character speed source, and Run Modifier speed source.
+- Existing project/global variables remain in the same dropdown.
+- Test Run synchronizes Player.X and Player.Y with the live player position, allowing Compare/Set/Change Variable nodes to work directly with player coordinates.
+- Preset values are included in generated Blueprint variable storage for export; deeper native object-instance binding will be expanded with the object runtime.
