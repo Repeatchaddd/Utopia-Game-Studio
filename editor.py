@@ -127,7 +127,7 @@ class TestRunner(tk.Toplevel):
   super().__init__(parent);self.title(f"{APP_NAME} Test Run");self.geometry("960x600");self.minsize(640,400);self.project=json.loads(json.dumps(project));self.bp=movement
   self.bp_vars=dict(self.bp.get("variables",{}));self.rpg_stats={k:dict(v) for k,v in self.bp.get("stats",{}).items()};self.game=GameRuntime(self.project,self.bp_vars);self.first_tick=True
   self.pressed=set();self.inventory_open=False;self.x=float(self.project["player_x"]);self.y=float(self.project["player_y"]);self.facing="down";self.frame=0;self.anim_tick=0;self.last_anim=None;self.photos={};self.closed=False
-  info=ttk.Frame(self,padding=6);info.pack(fill="x");ttk.Label(info,text="Move: Arrow keys or WASD   •   Wii U A=Z, B=X, X=C, Y=V   •   I: Inventory   •   Shift tests Run Modifier nodes   •   Esc: Stop",anchor="center").pack(fill="x")
+  info=ttk.Frame(self,padding=6);info.pack(fill="x");ttk.Label(info,text="Move: Arrow keys or WASD   •   Wii U A=Z, B=X, X=C, Y=V   •   I: Inventory   •   E: Interact   •   Shift tests Run Modifier nodes   •   Esc: Stop",anchor="center").pack(fill="x")
   self.canvas=tk.Canvas(self,background=self.project["background"],highlightthickness=0);self.canvas.pack(fill="both",expand=True)
   self.bind("<KeyPress>",self.key_down);self.bind("<KeyRelease>",self.key_up);self.bind("<Escape>",lambda _e:self.close());self.bind("<FocusOut>",lambda _e:self.pressed.clear());self.protocol("WM_DELETE_WINDOW",self.close);self.focus_force();self.after(16,self.tick)
  def close(self):self.closed=True;self.destroy()
@@ -135,6 +135,8 @@ class TestRunner(tk.Toplevel):
   key=event.keysym.lower()
   if key=="i":
    self.inventory_open=not self.inventory_open;return
+  if key=="e":
+   self.game.interact(self);return
   fresh=key not in self.pressed;self.pressed.add(key)
   if fresh:
    button=next((b for b,k in self.BUTTON_KEYS.items() if k==key),None)
