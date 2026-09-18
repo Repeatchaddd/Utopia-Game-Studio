@@ -1,7 +1,7 @@
-# Utopia Game Studio v1.95.002.002
+# Utopia Game Studio v1.95.002.003
 
 **Current development stage:** 1.95  
-**Build:** 1.95.002.002
+**Build:** 1.95.002.003
 
 ## v1.95.002.000 — RPG Stat System
 
@@ -211,3 +211,12 @@ Utopia Game Studio is not affiliated with or endorsed by Nintendo, Epic Games, o
 - Existing project/global variables remain in the same dropdown.
 - Test Run synchronizes Player.X and Player.Y with the live player position, allowing Compare/Set/Change Variable nodes to work directly with player coordinates.
 - Preset values are included in generated Blueprint variable storage for export; deeper native object-instance binding will be expanded with the object runtime.
+
+
+### v1.95.002.003
+- Blueprint Logic now supports Delete to remove the selected node.
+- Added Ctrl+X Cut, Ctrl+C Copy, and Ctrl+V Paste keyboard shortcuts while the Blueprint editor has focus.
+- Added Cut, Copy, and Paste toolbar buttons for mouse-driven editing.
+- Copied/cut nodes retain their complete node type and properties.
+- Pasted nodes receive a new unique node ID and are offset from the source so duplicates are visible.
+- Connections are intentionally not copied or pasted; deleting/cutting a node safely removes its existing links.
