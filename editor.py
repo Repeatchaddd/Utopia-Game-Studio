@@ -7,7 +7,7 @@ from tkinter import colorchooser, filedialog, messagebox, simpledialog, ttk
 from blueprint_editor import BlueprintPanel, default_graph
 from game_framework import FrameworkPanel, GameRuntime, default_framework, ensure_framework
 from rpg_stats import RPGStatsPanel, default_stats, ensure_stats
-from inventory_system import default_inventory, ensure_inventory
+from inventory_system import default_inventory, ensure_inventory, bag_count, add_to_bag, remove_from_bag, equip_item, unequip_item
 from inventory_editor import InventoryPanel
 
 APP_NAME, VERSION = "Utopia Game Studio", "1.95.002.000"
@@ -150,7 +150,11 @@ class TestRunner(tk.Toplevel):
   self.x=float(self.bp_vars.get("Player.X",self.x));self.y=float(self.bp_vars.get("Player.Y",self.y))
  def gates_ok(self,action):
   self.sync_preset_variables()
-  return all(self.compare((self.rpg_stats.get(g["stat"],{}).get("current",0) if "stat" in g else self.bp_vars.get(g["variable"],0)),g.get("op","=="),int(g.get("value",0))) for g in action.get("gates",[]))
+  for g in action.get("gates",[]):
+   if "item" in g:
+    if bag_count(self.project,g["item"])<int(g.get("quantity",1)):return False
+   elif not self.compare((self.rpg_stats.get(g["stat"],{}).get("current",0) if "stat" in g else self.bp_vars.get(g["variable"],0)),g.get("op","=="),int(g.get("value",0))):return False
+  return True
  def action_speed(self,action,lo,hi):
   value=self.bp_vars.get(action.get("speed_variable",""),action.get("speed",100))
   return max(lo,min(hi,int(value)))
@@ -170,18 +174,27 @@ class TestRunner(tk.Toplevel):
   elif t=="Set Stat":s["current"]=value
   else:s["current"]+=value
   s["current"]=max(s["minimum"],min(s["maximum"],s["current"]))
+ def apply_inventory_action(self,action):
+  if not self.gates_ok(action):return
+  t=action.get("type")
+  if t=="Add Item":add_to_bag(self.project,action.get("item",""),int(action.get("quantity",1)))
+  elif t=="Remove Item":remove_from_bag(self.project,action.get("item",""),int(action.get("quantity",1)))
+  elif t=="Equip Item":equip_item(self.project,action.get("item",""),action.get("slot","Main Hand"))
+  elif t=="Unequip Slot":unequip_item(self.project,action.get("slot","Main Hand"))
  def apply_input_actions(self,button):
   for action in self.bp.get("actions",[]):
    if action.get("source")=="input" and action.get("button")==button:
     if action.get("type") in ("Set Variable","Change Variable"):self.apply_variable_action(action)
     elif action.get("type") in ("Set Stat","Change Stat","Set Max Stat"):self.apply_stat_action(action)
+    elif action.get("type") in ("Add Item","Remove Item","Equip Item","Unequip Slot"):self.apply_inventory_action(action)
  def apply_frame_variable_actions(self,first):
   for action in self.bp.get("actions",[]):
-   if action.get("type") not in ("Set Variable","Change Variable","Set Stat","Change Stat","Set Max Stat"):continue
+   if action.get("type") not in ("Set Variable","Change Variable","Set Stat","Change Stat","Set Max Stat","Add Item","Remove Item","Equip Item","Unequip Slot"):continue
    source=action.get("source")
    if source=="update" or (source=="start" and first):
     if action.get("type") in ("Set Variable","Change Variable"):self.apply_variable_action(action)
-    else:self.apply_stat_action(action)
+    elif action.get("type") in ("Set Stat","Change Stat","Set Max Stat"):self.apply_stat_action(action)
+    else:self.apply_inventory_action(action)
  def action_active(self,action,first):
   source=action.get("source")
   if source=="start":return first
