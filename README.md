@@ -1,31 +1,26 @@
-# Utopia Game Studio v1.95.001.001
+# Utopia Game Studio v1.95.002.000
 
 **Current development stage:** 1.95  
-**Build:** 1.95.001.001
+**Build:** 1.95.002.000
 
-## v1.95.001.001 — Game Creator Skeleton
+## v1.95.002.000 — RPG Stat System
 
-This release establishes Utopia as a simple general-purpose 2D/2.5D game creator rather than only a movement/animation editor.
+This build resumes feature development from the verified pre-splash v1.95.001.001 baseline. Splash-screen code is intentionally not included.
 
-New framework capabilities:
-- reusable Game Objects: Player, NPC, Enemy, Item, and Generic
-- multiple rooms with a selectable start room
-- object instances placed into rooms
-- Game Start, Room Start, Update, and Collision events
-- event actions for variables, visibility, destroying objects, room changes, and simple movement
-- global game-state variables shared with Test Run
-- object-to-player and object-to-object collision event dispatch
-- automatic migration of older Utopia project files into the new framework
-- existing Blueprint movement and graph execution retained
-- Test Run now executes both Blueprint logic and the generic game framework
+New RPG stat capabilities:
+- dedicated **RPG Stats** editor tab
+- default Life, Mana, Stamina, Level, and Experience stats
+- custom user-defined stats
+- starting, minimum, and maximum values
+- resource-style Current / Maximum stats
+- automatic minimum/maximum clamping
+- Blueprint nodes: **Set Stat**, **Change Stat**, **Set Max Stat**, and **Compare Stat**
+- stat comparisons can gate movement, variable actions, and other stat actions
+- Test Run executes stat changes and displays Life, Mana, and Stamina values
+- exported Wii U Blueprint runtime includes the same stat storage, limits, comparisons, changes, and clamping
+- older Utopia projects automatically receive the default RPG stats when opened
 
-The Game Framework tab is the first skeleton layer. More node types, visual instance placement, object animation assignment, richer conditions, and Wii U runtime parity will be expanded through later 1.95.xxx.xxx builds.
-
-## v1.95.001.001 startup fix
-
-- Corrected the packaged Python 3.14 startup issue where `tk.BooleanVar(False)` treated `False` as the Tk master argument.
-- Packaged build now uses `tk.BooleanVar(value=False)`.
-- No project-format or framework behavior change is intended by this patch.
+Example: connect a GamePad Input node to **Change Stat** with Life = -10 to test damage. Use **Compare Stat: Mana >= 20** before a spell action, then **Change Stat: Mana = -20** to spend mana.
 
 ---
 
