@@ -5,7 +5,7 @@ import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
 
 OBJECT_KINDS=("Player","NPC","Enemy","Item","Generic")
-EVENT_TYPES=("Game Start","Room Start","Update","Collision")
+EVENT_TYPES=("Game Start","Room Start","Update","Collision","Interact")
 ACTION_TYPES=("Set Variable","Change Variable","Destroy Self","Hide Self","Show Self","Change Room","Move Self","Add Item")
 COMPARE_OPS=("==","!=", "<","<=",">",">=")
 PRESET_OBJECT_VARIABLES=("X","Y","Visible","Active","Width","Height","Solid")
@@ -32,7 +32,7 @@ def ensure_framework(project):
   if len(room["room_map"])<40*23:room["room_map"]=(room["room_map"]+[-1]*(40*23))[:40*23]
  for obj in fw["objects"]:
   obj.setdefault("kind","Generic");obj.setdefault("width",48);obj.setdefault("height",48);obj.setdefault("color","#ff8c42")
-  obj.setdefault("visible",True);obj.setdefault("solid",False);obj.setdefault("variables",{});obj.setdefault("events",[])
+  obj.setdefault("visible",True);obj.setdefault("solid",False);obj.setdefault("variables",{});obj.setdefault("events",[]);obj.setdefault("interact_range",72)
  names=[r["name"] for r in fw["rooms"]]
  if fw["start_room"] not in names:fw["start_room"]=names[0]
  return fw
@@ -62,7 +62,7 @@ class FrameworkPanel(ttk.Frame):
   ib=ttk.Frame(mid);ib.grid(row=2,column=0,sticky="ew");ttk.Button(ib,text="Place Object",command=self.place_object).pack(side="left");ttk.Button(ib,text="Edit Instance",command=self.edit_instance).pack(side="left",padx=3);ttk.Button(ib,text="Delete Instance",command=self.delete_instance).pack(side="left")
   self.event_list=tk.Listbox(right,width=38,height=12,exportselection=False);self.event_list.pack(fill="both",expand=True)
   ttk.Button(right,text="Add Event",command=self.add_event).pack(fill="x",pady=(8,2));ttk.Button(right,text="Add Action",command=self.add_action).pack(fill="x");ttk.Button(right,text="Delete Event",command=self.delete_event).pack(fill="x",pady=(2,0))
-  ttk.Label(right,text="Programming skeleton:\nStart / Room Start / Update / Collision\nVariables, room changes, visibility,\ndestroy and simple movement.",justify="left").pack(anchor="w",pady=(12,0))
+  ttk.Label(right,text="Programming skeleton:\nStart / Room Start / Update / Collision / Interact\nVariables, room changes, visibility,\ndestroy and simple movement.",justify="left").pack(anchor="w",pady=(12,0))
  def selected_object(self):
   s=self.object_list.curselection();objs=self.fw()["objects"];return objs[s[0]] if s and s[0]<len(objs) else None
  def selected_room(self):return find_room(self.get_project(),self.room.get())
@@ -80,7 +80,7 @@ class FrameworkPanel(ttk.Frame):
   self.event_list.delete(0,"end");obj=self.selected_object()
   if not obj:return
   for n,e in enumerate(obj["events"]):
-   extra=f" -> {e.get('other','')}" if e["type"]=="Collision" else ""
+   extra=f" -> {e.get('other','')}" if e["type"]=="Collision" else (" [near player]" if e["type"]=="Interact" else "")
    self.event_list.insert("end",f"{n+1:02d} {e['type']}{extra}  [{len(e.get('actions',[]))} action(s)]")
  def add_object(self):
   name=simpledialog.askstring("Utopia Game Studio","Object name:",parent=self)
@@ -89,7 +89,7 @@ class FrameworkPanel(ttk.Frame):
   if not name or find_object(self.get_project(),name):messagebox.showerror("Utopia Game Studio","Object names must be unique.");return
   kind=simpledialog.askstring("Utopia Game Studio","Kind: Player, NPC, Enemy, Item, Generic",initialvalue="Generic",parent=self) or "Generic"
   if kind not in OBJECT_KINDS:kind="Generic"
-  self.fw()["objects"].append({"name":name,"kind":kind,"width":48,"height":48,"color":"#ff8c42","visible":True,"solid":False,"variables":{},"events":[]});self.refresh();self.changed();self.status.set("Game object created")
+  self.fw()["objects"].append({"name":name,"kind":kind,"width":48,"height":48,"color":"#ff8c42","visible":True,"solid":False,"variables":{},"events":[],"interact_range":72});self.refresh();self.changed();self.status.set("Game object created")
  def edit_object(self):
   o=self.selected_object()
   if not o:return
@@ -97,6 +97,8 @@ class FrameworkPanel(ttk.Frame):
   if w is not None:o["width"]=w
   if h is not None:o["height"]=h
   solid=messagebox.askyesno("Object Properties","Should this object block/collide as solid?",parent=self);o["solid"]=solid
+  rng=simpledialog.askinteger("Object Properties","Interaction range in pixels:",initialvalue=o.get("interact_range",72),minvalue=1,maxvalue=512,parent=self)
+  if rng is not None:o["interact_range"]=rng
   self.refresh();self.changed()
  def manage_object_variables(self):
   o=self.selected_object()
@@ -149,7 +151,7 @@ class FrameworkPanel(ttk.Frame):
  def add_event(self):
   o=self.selected_object()
   if not o:return
-  et=simpledialog.askstring("Add Event","Event: Game Start, Room Start, Update, Collision",initialvalue="Update",parent=self)
+  et=simpledialog.askstring("Add Event","Event: Game Start, Room Start, Update, Collision, Interact",initialvalue="Update",parent=self)
   if et not in EVENT_TYPES:return
   event={"type":et,"actions":[]}
   if et=="Collision":
@@ -248,6 +250,16 @@ class GameRuntime:
    if e["type"]!=event_type:continue
    if event_type=="Collision" and e.get("other")!=other:continue
    self.actions(runner,inst,e.get("actions",[]))
+ def interact(self,runner):
+  px=runner.x+runner.project["player_width"]/2;py=runner.y+runner.project["player_height"]/2
+  best=None;best_d=None
+  for inst in self.instances():
+   o=self.obj(inst)
+   if not o or not any(e.get("type")=="Interact" for e in o.get("events",[])):continue
+   cx=inst["x"]+o.get("width",48)/2;cy=inst["y"]+o.get("height",48)/2;dx=cx-px;dy=cy-py;d=(dx*dx+dy*dy)**0.5
+   if d<=float(o.get("interact_range",72)) and (best_d is None or d<best_d):best=inst;best_d=d
+  if best is not None:self.fire(runner,best,"Interact")
+  return best is not None
  def step(self,runner,first=False):
   instances=list(self.instances())
   if not self.started:
