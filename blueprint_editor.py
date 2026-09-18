@@ -365,10 +365,12 @@ class BlueprintPanel(ttk.Frame):
      slot=pr.get("slot","Main Hand")
      if slot in SLOTS:action.update(slot=slot);cfg["actions"].append(action)
      action=None
-    else:
+    elif t in ("Set Stat","Change Stat","Set Max Stat"):
      name=pr.get("stat","")
      if name in cfg["stats"]:action.update(stat=name,value=int(pr.get("value",0)));cfg["actions"].append(action)
      action=None
+    elif t in ("Interact","Toggle Inventory"):
+     pass
     if action is not None:cfg["actions"].append(action)
    for child in outs.get(node_id,[]):walk(child,source,button,gates,path)
   for n in g["nodes"]:
