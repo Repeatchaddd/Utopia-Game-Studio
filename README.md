@@ -1,7 +1,7 @@
-# Utopia Game Studio v1.95.004.001
+# Utopia Game Studio v1.95.005.000
 
 **Current development stage:** 1.95  
-**Build:** 1.95.004.001
+**Build:** 1.95.005.000
 
 ## v1.95.002.000 — RPG Stat System
 
@@ -276,3 +276,14 @@ Utopia Game Studio is not affiliated with or endorsed by Nintendo, Epic Games, o
 - Removed the hard-coded E = Interact binding from editor.py and Test Run.
 - Interact remains a general object event available to projects.
 - Physical keyboard/gamepad mappings belong to project-defined controls or explicit test/example games, not the editor runtime.
+
+
+### v1.95.005.000 — Project Input / Controls System
+- Added a Controls tab with project-defined named Input Actions.
+- New projects start with no physical controls assigned.
+- Each Input Action can have keyboard and Wii U GamePad bindings.
+- Added Blueprint Input Action nodes; game logic references the named action rather than a physical key/button.
+- Added Blueprint Interact and Toggle Inventory actions so projects decide which controls activate those systems.
+- Removed Test Run's built-in movement/button/inventory assumptions; Test Run reads the project's keyboard mappings.
+- New Blueprint graphs no longer create predefined movement/gamepad nodes. Existing legacy GamePad Input nodes remain readable for project compatibility.
+- Object Interact remains an engine event and is activated only when project logic routes a configured Input Action to Interact.
