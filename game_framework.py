@@ -6,7 +6,7 @@ from tkinter import messagebox, simpledialog, ttk
 
 OBJECT_KINDS=("Player","NPC","Enemy","Item","Generic")
 EVENT_TYPES=("Game Start","Room Start","Update","Collision")
-ACTION_TYPES=("Set Variable","Change Variable","Destroy Self","Hide Self","Show Self","Change Room","Move Self")
+ACTION_TYPES=("Set Variable","Change Variable","Destroy Self","Hide Self","Show Self","Change Room","Move Self","Add Item")
 COMPARE_OPS=("==","!=", "<","<=",">",">=")
 PRESET_OBJECT_VARIABLES=("X","Y","Visible","Active","Width","Height","Solid")
 def object_variable_names(obj):
@@ -181,6 +181,11 @@ class FrameworkPanel(ttk.Frame):
    a["room"]=simpledialog.askstring("Action","Destination room:",initialvalue=self.fw()["start_room"],parent=self) or self.fw()["start_room"]
   elif kind=="Move Self":
    a["dx"]=simpledialog.askinteger("Action","Move X per update:",initialvalue=0,parent=self) or 0;a["dy"]=simpledialog.askinteger("Action","Move Y per update:",initialvalue=0,parent=self) or 0
+  elif kind=="Add Item":
+   from inventory_system import item_names
+   names=item_names(self.get_project());a["item"]=simpledialog.askstring("Action","Item to add:\n"+", ".join(names),initialvalue=names[0] if names else "",parent=self) or ""
+   if a["item"] not in names:return
+   a["quantity"]=simpledialog.askinteger("Action","Quantity:",initialvalue=1,minvalue=1,parent=self) or 1
   event["actions"].append(a);self.refresh_events();self.changed()
  def delete_event(self):
   o=self.selected_object();e=self.selected_event()
@@ -231,6 +236,9 @@ class GameRuntime:
    elif t=="Hide Self":self.hidden.add(inst["id"])
    elif t=="Show Self":self.hidden.discard(inst["id"])
    elif t=="Move Self":inst["x"]+=int(a.get("dx",0));inst["y"]+=int(a.get("dy",0))
+   elif t=="Add Item":
+    from inventory_system import add_to_bag
+    add_to_bag(self.project,a.get("item",""),int(a.get("quantity",1)))
    elif t=="Change Room":
     if any(r["name"]==a.get("room") for r in self.fw["rooms"]):self.room_name=a["room"];self.room_started=True
  def fire(self,runner,inst,event_type,other=None):
