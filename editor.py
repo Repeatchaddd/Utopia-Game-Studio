@@ -184,7 +184,11 @@ class TestRunner(tk.Toplevel):
  def apply_input_actions(self,button):
   for action in self.bp.get("actions",[]):
    if action.get("source") in ("input","action") and action.get("button")==button:
-    if action.get("type") in ("Set Variable","Change Variable"):self.apply_variable_action(action)
+    if action.get("type")=="Interact":
+     if self.gates_ok(action):self.game.interact(self)
+    elif action.get("type")=="Toggle Inventory":
+     if self.gates_ok(action):self.inventory_open=not self.inventory_open
+    elif action.get("type") in ("Set Variable","Change Variable"):self.apply_variable_action(action)
     elif action.get("type") in ("Set Stat","Change Stat","Set Max Stat"):self.apply_stat_action(action)
     elif action.get("type") in ("Add Item","Remove Item","Equip Item","Unequip Slot"):self.apply_inventory_action(action)
  def apply_frame_variable_actions(self,first):
