@@ -1,7 +1,7 @@
-# Utopia Game Studio v1.95.003.001
+# Utopia Game Studio v1.95.003.002
 
 **Current development stage:** 1.95  
-**Build:** 1.95.003.001
+**Build:** 1.95.003.002
 
 ## v1.95.002.000 — RPG Stat System
 
@@ -241,3 +241,13 @@ Utopia Game Studio is not affiliated with or endorsed by Nintendo, Epic Games, o
 - Inventory actions honor existing variable/stat gates on the same execution path.
 - Test Run uses the same bag capacity, stacking, equipment-slot compatibility, equip replacement, and unequip rules as the Inventory editor.
 - Blueprint compiled configuration now carries the project's inventory definition/state, preparing inventory data for native Wii U export.
+
+
+### v1.95.003.002 — Equipment Stat Modifiers
+- Item definitions can now carry signed RPG stat modifiers such as Attack=10, Defense=8, Mana=20, or Speed=-2.
+- The Inventory item editor now provides fields for stat modifiers and item descriptions.
+- Equipped-item modifiers are summed across every occupied equipment slot.
+- Unequipping or replacing an item immediately removes its modifiers; equipping immediately applies them.
+- Test Run RPG HUD now displays equipment-adjusted Life, Mana, and Stamina values/maxima.
+- Added reusable equipment_modifiers/effective_stat helpers so combat, Blueprint comparisons, and native Wii U runtime can consume the same modifier model in subsequent systems.
+- Base RPG stat data is kept separate from equipment bonuses, preventing permanent stat corruption when gear is changed.
