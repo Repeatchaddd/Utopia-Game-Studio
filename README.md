@@ -1,7 +1,7 @@
-# Utopia Game Studio v1.95.003.002
+# Utopia Game Studio v1.95.003.003
 
 **Current development stage:** 1.95  
-**Build:** 1.95.003.002
+**Build:** 1.95.003.003
 
 ## v1.95.002.000 — RPG Stat System
 
@@ -251,3 +251,12 @@ Utopia Game Studio is not affiliated with or endorsed by Nintendo, Epic Games, o
 - Test Run RPG HUD now displays equipment-adjusted Life, Mana, and Stamina values/maxima.
 - Added reusable equipment_modifiers/effective_stat helpers so combat, Blueprint comparisons, and native Wii U runtime can consume the same modifier model in subsequent systems.
 - Base RPG stat data is kept separate from equipment bonuses, preventing permanent stat corruption when gear is changed.
+
+
+### v1.95.003.003 — Runtime Inventory View and Object Pickups
+- Test Run now has an inventory screen toggled with the I key.
+- The runtime inventory view separates Bag contents from Equipped Items and shows bag slot usage.
+- Bag entries show quantities and equipment stat modifiers.
+- Added Add Item as a general Game Framework object-event action.
+- Objects can now award configured inventory items and quantities from editor-created events such as Collision with Player.
+- Add Item can be combined with Destroy Self to build collectible/pickup objects entirely through editor functions.
