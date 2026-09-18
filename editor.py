@@ -126,13 +126,16 @@ class TestRunner(tk.Toplevel):
  def __init__(self,parent,project,movement):
   super().__init__(parent);self.title(f"{APP_NAME} Test Run");self.geometry("960x600");self.minsize(640,400);self.project=json.loads(json.dumps(project));self.bp=movement
   self.bp_vars=dict(self.bp.get("variables",{}));self.rpg_stats={k:dict(v) for k,v in self.bp.get("stats",{}).items()};self.game=GameRuntime(self.project,self.bp_vars);self.first_tick=True
-  self.pressed=set();self.x=float(self.project["player_x"]);self.y=float(self.project["player_y"]);self.facing="down";self.frame=0;self.anim_tick=0;self.last_anim=None;self.photos={};self.closed=False
-  info=ttk.Frame(self,padding=6);info.pack(fill="x");ttk.Label(info,text="Move: Arrow keys or WASD   •   Wii U A=Z, B=X, X=C, Y=V   •   Shift also tests connected Run Modifier nodes   •   Esc: Stop",anchor="center").pack(fill="x")
+  self.pressed=set();self.inventory_open=False;self.x=float(self.project["player_x"]);self.y=float(self.project["player_y"]);self.facing="down";self.frame=0;self.anim_tick=0;self.last_anim=None;self.photos={};self.closed=False
+  info=ttk.Frame(self,padding=6);info.pack(fill="x");ttk.Label(info,text="Move: Arrow keys or WASD   •   Wii U A=Z, B=X, X=C, Y=V   •   I: Inventory   •   Shift tests Run Modifier nodes   •   Esc: Stop",anchor="center").pack(fill="x")
   self.canvas=tk.Canvas(self,background=self.project["background"],highlightthickness=0);self.canvas.pack(fill="both",expand=True)
   self.bind("<KeyPress>",self.key_down);self.bind("<KeyRelease>",self.key_up);self.bind("<Escape>",lambda _e:self.close());self.bind("<FocusOut>",lambda _e:self.pressed.clear());self.protocol("WM_DELETE_WINDOW",self.close);self.focus_force();self.after(16,self.tick)
  def close(self):self.closed=True;self.destroy()
  def key_down(self,event):
-  key=event.keysym.lower();fresh=key not in self.pressed;self.pressed.add(key)
+  key=event.keysym.lower()
+  if key=="i":
+   self.inventory_open=not self.inventory_open;return
+  fresh=key not in self.pressed;self.pressed.add(key)
   if fresh:
    button=next((b for b,k in self.BUTTON_KEYS.items() if k==key),None)
    if button is None:button=next((b for b,keys in self.KEY_GROUPS.items() if key in keys),None)
@@ -276,10 +279,26 @@ class TestRunner(tk.Toplevel):
    self.photos["shown"]=shown;self.canvas.create_image(x,y,image=shown,anchor="nw")
   else:self.canvas.create_rectangle(x,y,x+pw,y+ph,fill=self.project["player_color"],outline="white")
   self.canvas.create_text(ox+8,oy+8,text=self.project["title"] or "Untitled",fill="white",anchor="nw")
+  if self.inventory_open:self.draw_inventory(scale,ox,oy)
   if self.rpg_stats:
    mods=equipment_modifiers(self.project)
    stat_text="   ".join(f"{name}: {s['current']+mods.get(name,0)}/{s['maximum']+mods.get(name,0)}" for name,s in self.rpg_stats.items() if name in ("Life","Mana","Stamina"))
    if stat_text:self.canvas.create_text(ox+8,oy+28,text=stat_text,fill="white",anchor="nw")
+
+ def draw_inventory(self,scale,ox,oy):
+  inv=ensure_inventory(self.project);x=ox+210*scale;y=oy+90*scale;w=860*scale;h=540*scale
+  self.canvas.create_rectangle(x,y,x+w,y+h,fill="#151515",outline="white",width=2)
+  self.canvas.create_text(x+20*scale,y+18*scale,text="INVENTORY  —  I to close",fill="white",anchor="nw",font=("Segoe UI",max(10,int(18*scale)),"bold"))
+  self.canvas.create_text(x+20*scale,y+60*scale,text=f"BAG  {len(inv['bag'])}/{inv['bag_capacity']} slots",fill="white",anchor="nw",font=("Segoe UI",max(9,int(14*scale)),"bold"))
+  yy=y+92*scale
+  if not inv["bag"]:self.canvas.create_text(x+30*scale,yy,text="(empty)",fill="#cccccc",anchor="nw")
+  for row in inv["bag"]:
+   item=next((i for i in inv["items"] if i["name"]==row["item"]),{})
+   mods="  ".join(f"{k}{int(v):+d}" for k,v in item.get("stats",{}).items())
+   self.canvas.create_text(x+30*scale,yy,text=f"{row['item']} x{row['quantity']}  {mods}",fill="white",anchor="nw");yy+=26*scale
+  ex=x+470*scale;self.canvas.create_text(ex,y+60*scale,text="EQUIPPED",fill="white",anchor="nw",font=("Segoe UI",max(9,int(14*scale)),"bold"));ey=y+92*scale
+  for slot,name in inv["equipped"].items():
+   self.canvas.create_text(ex,ey,text=f"{slot}: {name or '-'}",fill="white" if name else "#aaaaaa",anchor="nw");ey+=25*scale
 
 class Editor(tk.Tk):
  def __init__(self):
