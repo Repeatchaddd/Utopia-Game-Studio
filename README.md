@@ -195,3 +195,11 @@ Removing one of those links disables that direction in the exported game. Start,
 Create a variable such as `WalkSpeed = 100`, assign it as the speed source for the four Move Character nodes, then connect a GamePad button to **Set Variable** or **Change Variable**. In Test Run, confirm the button changes movement speed immediately. Also test a **Compare Variable** between an input and a movement/action node to confirm the action is allowed only when the comparison is true. Then connect one GamePad input to two different Move Character directions and confirm both execute together. Also confirm Start executes once, Update executes continuously, variable actions fire from their connected paths, Compare Variable gates downstream nodes, and **Delete Link** removes only the selected connection. Export `utopia_wiiu_export_v0_95_02` and repeat the runtime test in Cemu or on Wii U hardware when available.
 
 Utopia Game Studio is not affiliated with or endorsed by Nintendo, Epic Games, or YoYo Games.
+
+
+### v1.95.002.001
+- Added preset object variables: X, Y, Visible, Active, Width, Height, and Solid.
+- Added an Object Variables editor for custom per-object variables.
+- Set Variable / Change Variable object actions now use a read-only dropdown instead of requiring a typed variable name.
+- Variable dropdown includes the selected object's Self.* variables plus existing project/global variables.
+- Test Run resolves Self.* variables against the active object instance, so position/state/custom values are functional rather than editor-only.
