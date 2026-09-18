@@ -1,7 +1,7 @@
-# Utopia Game Studio v1.95.006.000
+# Utopia Game Studio v1.95.006.001
 
 **Current development stage:** 1.95  
-**Build:** 1.95.006.000
+**Build:** 1.95.006.001
 
 ## v1.95.002.000 — RPG Stat System
 
@@ -297,3 +297,12 @@ Utopia Game Studio is not affiliated with or endorsed by Nintendo, Epic Games, o
 - Test Run renders dialogue in a game-style dialogue box and pauses normal project input while a conversation is active.
 - Enter or Space advances dialogue pages in Test Run; these are editor test controls for the dialogue viewer rather than project gameplay bindings.
 - Dialogue definitions are project data and can be reused by multiple objects/events.
+
+
+### v1.95.006.001 — Branching Dialogue Choices
+- Dialogue pages can now contain player choices.
+- Each choice has visible choice text and an optional destination conversation.
+- A choice can branch into another reusable conversation or end dialogue when no destination is supplied.
+- Test Run displays choices beneath dialogue text and supports selection/branching.
+- Choice navigation is currently a Test Run viewer function (Up/Down and Enter); gameplay control mapping remains separate from editor-defined project controls.
+- Branch destinations use conversation names, keeping dialogue reusable across NPCs and object events.
