@@ -9,8 +9,9 @@ from game_framework import FrameworkPanel, GameRuntime, default_framework, ensur
 from rpg_stats import RPGStatsPanel, default_stats, ensure_stats
 from inventory_system import default_inventory, ensure_inventory, bag_count, add_to_bag, remove_from_bag, equip_item, unequip_item, equipment_modifiers
 from inventory_editor import InventoryPanel
+from input_controls import ControlsPanel, default_controls, ensure_controls
 
-APP_NAME, VERSION = "Utopia Game Studio", "1.95.002.000"
+APP_NAME, VERSION = "Utopia Game Studio", "1.95.005.000"
 ROOT = Path(__file__).resolve().parent
 TEMPLATE = ROOT / "runtime_template"
 ANIMATION_STATES=("idle_down","idle_left","idle_right","idle_up","walk_down","walk_left","walk_right","walk_up")
@@ -18,7 +19,7 @@ DEFAULT = {"format":"utopia-project-8","title":"My Utopia RPG","author":"Homebre
  "game_style":"2D / 2.5D RPG","background":"#18365c","player_color":"#f4d35e",
  "player_x":560,"player_y":320,"player_width":80,"player_height":80,"player_speed":6,
  "animations":{},"active_animation":"","directional_animations":{key:"" for key in ANIMATION_STATES},"blueprint":default_graph(),
- "tiles":[],"room_map":[-1]*(40*23),"variables":[],"rpg_stats":default_stats(),"inventory":default_inventory(),"framework":default_framework()}
+ "tiles":[],"room_map":[-1]*(40*23),"variables":[],"rpg_stats":default_stats(),"inventory":default_inventory(),"controls":default_controls(),"framework":default_framework()}
 
 def fresh(): return json.loads(json.dumps(DEFAULT))
 def rgba(value): return "0x" + value.lstrip("#").upper() + "FFu"
@@ -127,23 +128,19 @@ class TestRunner(tk.Toplevel):
   super().__init__(parent);self.title(f"{APP_NAME} Test Run");self.geometry("960x600");self.minsize(640,400);self.project=json.loads(json.dumps(project));self.bp=movement
   self.bp_vars=dict(self.bp.get("variables",{}));self.rpg_stats={k:dict(v) for k,v in self.bp.get("stats",{}).items()};self.game=GameRuntime(self.project,self.bp_vars);self.first_tick=True
   self.pressed=set();self.inventory_open=False;self.x=float(self.project["player_x"]);self.y=float(self.project["player_y"]);self.facing="down";self.frame=0;self.anim_tick=0;self.last_anim=None;self.photos={};self.closed=False
-  info=ttk.Frame(self,padding=6);info.pack(fill="x");ttk.Label(info,text="Move: Arrow keys or WASD   •   Wii U A=Z, B=X, X=C, Y=V   •   I: Inventory   •   Shift tests Run Modifier nodes   •   Esc: Stop",anchor="center").pack(fill="x")
+  info=ttk.Frame(self,padding=6);info.pack(fill="x");ttk.Label(info,text="Test Run uses this project’s Controls mappings. Esc closes Test Run.",anchor="center").pack(fill="x")
   self.canvas=tk.Canvas(self,background=self.project["background"],highlightthickness=0);self.canvas.pack(fill="both",expand=True)
   self.bind("<KeyPress>",self.key_down);self.bind("<KeyRelease>",self.key_up);self.bind("<Escape>",lambda _e:self.close());self.bind("<FocusOut>",lambda _e:self.pressed.clear());self.protocol("WM_DELETE_WINDOW",self.close);self.focus_force();self.after(16,self.tick)
  def close(self):self.closed=True;self.destroy()
  def key_down(self,event):
-  key=event.keysym.lower()
-  if key=="i":
-   self.inventory_open=not self.inventory_open;return
-  fresh=key not in self.pressed;self.pressed.add(key)
-  if fresh:
-   button=next((b for b,k in self.BUTTON_KEYS.items() if k==key),None)
-   if button is None:button=next((b for b,keys in self.KEY_GROUPS.items() if key in keys),None)
-   if button:self.apply_input_actions(button)
+  key=event.keysym.lower();fresh=key not in self.pressed;self.pressed.add(key)
+  if not fresh:return
+  for action in ensure_controls(self.project)["actions"]:
+   if key in action.get("keyboard",[]):self.apply_input_actions(action["name"])
  def key_up(self,event):self.pressed.discard(event.keysym.lower())
- def button_held(self,name):
-  if name in self.KEY_GROUPS:return bool(self.KEY_GROUPS[name]&self.pressed)
-  return self.BUTTON_KEYS.get(name,"") in self.pressed
+ def action_held(self,name):
+  action=next((a for a in ensure_controls(self.project)["actions"] if a["name"]==name),None)
+  return bool(action and set(action.get("keyboard",[]))&self.pressed)
  def compare(self,left,op,right):
   return {"==":left==right,"!=":left!=right,"<":left<right,"<=":left<=right,">":left>right,">=":left>=right}.get(op,True)
  def sync_preset_variables(self):
@@ -186,7 +183,7 @@ class TestRunner(tk.Toplevel):
   elif t=="Unequip Slot":unequip_item(self.project,action.get("slot","Main Hand"))
  def apply_input_actions(self,button):
   for action in self.bp.get("actions",[]):
-   if action.get("source")=="input" and action.get("button")==button:
+   if action.get("source") in ("input","action") and action.get("button")==button:
     if action.get("type") in ("Set Variable","Change Variable"):self.apply_variable_action(action)
     elif action.get("type") in ("Set Stat","Change Stat","Set Max Stat"):self.apply_stat_action(action)
     elif action.get("type") in ("Add Item","Remove Item","Equip Item","Unequip Slot"):self.apply_inventory_action(action)
@@ -202,14 +199,14 @@ class TestRunner(tk.Toplevel):
   source=action.get("source")
   if source=="start":return first
   if source=="update":return True
-  return self.button_held(action.get("button",""))
+  return self.action_held(action.get("button","")) if source=="action" else False
  def collect_movement(self,first):
   vx100=vy100=0;run_percent=100;shift=bool({"shift_l","shift_r"}&self.pressed)
   for action in self.bp.get("actions",[]):
    t=action.get("type")
    if t not in ("Move Character","Run Modifier") or not self.gates_ok(action):continue
    active=self.action_active(action,first)
-   if t=="Run Modifier" and action.get("source")=="input" and shift:active=True
+
    if not active:continue
    if t=="Move Character":
     speed=self.action_speed(action,1,400);vx100+=int(action.get("dx",0))*speed;vy100+=int(action.get("dy",0))*speed
@@ -288,7 +285,7 @@ class TestRunner(tk.Toplevel):
  def draw_inventory(self,scale,ox,oy):
   inv=ensure_inventory(self.project);x=ox+210*scale;y=oy+90*scale;w=860*scale;h=540*scale
   self.canvas.create_rectangle(x,y,x+w,y+h,fill="#151515",outline="white",width=2)
-  self.canvas.create_text(x+20*scale,y+18*scale,text="INVENTORY  —  I to close",fill="white",anchor="nw",font=("Segoe UI",max(10,int(18*scale)),"bold"))
+  self.canvas.create_text(x+20*scale,y+18*scale,text="INVENTORY",fill="white",anchor="nw",font=("Segoe UI",max(10,int(18*scale)),"bold"))
   self.canvas.create_text(x+20*scale,y+60*scale,text=f"BAG  {len(inv['bag'])}/{inv['bag_capacity']} slots",fill="white",anchor="nw",font=("Segoe UI",max(9,int(14*scale)),"bold"))
   yy=y+92*scale
   if not inv["bag"]:self.canvas.create_text(x+30*scale,yy,text="(empty)",fill="#cccccc",anchor="nw")
@@ -313,9 +310,9 @@ class Editor(tk.Tk):
   ttk.Label(bar,text="2D / 2.5D",foreground="#356fa6").pack(side="right",padx=8)
   tabs=ttk.Notebook(self); tabs.pack(fill="both",expand=True,padx=8,pady=(0,8))
   self.status=tk.StringVar(value="Ready"); ttk.Label(self,textvariable=self.status,relief="sunken",anchor="w",padding=4).pack(fill="x")
-  scene=ttk.Frame(tabs,padding=8); room=ttk.Frame(tabs,padding=8); anim=ttk.Frame(tabs,padding=8); stats=ttk.Frame(tabs); inventory=ttk.Frame(tabs); framework=ttk.Frame(tabs); logic=ttk.Frame(tabs)
-  tabs.add(scene,text="Scene");tabs.add(room,text="Room / Tiles");tabs.add(anim,text="Animated Character");tabs.add(stats,text="RPG Stats");tabs.add(inventory,text="Inventory");tabs.add(framework,text="Game Framework");tabs.add(logic,text="Blueprint Logic")
-  self.build_scene(scene);self.build_room(room);self.build_anim(anim);self.stats_panel=RPGStatsPanel(stats,lambda:self.project,self.status,self.redraw);self.stats_panel.pack(fill="both",expand=True);self.inventory_panel=InventoryPanel(inventory,lambda:self.project,self.status,self.redraw);self.inventory_panel.pack(fill="both",expand=True);self.framework=FrameworkPanel(framework,lambda:self.project,self.status,self.redraw);self.framework.pack(fill="both",expand=True);self.blueprint=BlueprintPanel(logic,lambda:self.project,self.status);self.blueprint.pack(fill="both",expand=True)
+  scene=ttk.Frame(tabs,padding=8); room=ttk.Frame(tabs,padding=8); anim=ttk.Frame(tabs,padding=8); stats=ttk.Frame(tabs); inventory=ttk.Frame(tabs); controls=ttk.Frame(tabs); framework=ttk.Frame(tabs); logic=ttk.Frame(tabs)
+  tabs.add(scene,text="Scene");tabs.add(room,text="Room / Tiles");tabs.add(anim,text="Animated Character");tabs.add(stats,text="RPG Stats");tabs.add(inventory,text="Inventory");tabs.add(controls,text="Controls");tabs.add(framework,text="Game Framework");tabs.add(logic,text="Blueprint Logic")
+  self.build_scene(scene);self.build_room(room);self.build_anim(anim);self.stats_panel=RPGStatsPanel(stats,lambda:self.project,self.status,self.redraw);self.stats_panel.pack(fill="both",expand=True);self.inventory_panel=InventoryPanel(inventory,lambda:self.project,self.status,self.redraw);self.inventory_panel.pack(fill="both",expand=True);self.controls_panel=ControlsPanel(controls,lambda:self.project,self.status);self.controls_panel.pack(fill="both",expand=True);self.framework=FrameworkPanel(framework,lambda:self.project,self.status,self.redraw);self.framework.pack(fill="both",expand=True);self.blueprint=BlueprintPanel(logic,lambda:self.project,self.status);self.blueprint.pack(fill="both",expand=True)
 
  def build_scene(self,parent):
   body=ttk.Panedwindow(parent,orient="horizontal"); body.pack(fill="both",expand=True)
@@ -460,7 +457,7 @@ class Editor(tk.Tk):
  def load_project(self):
   for k,v in self.vars.items():v.set(str(self.project[k]))
   self.project.setdefault("directional_animations",{})
-  self.project.setdefault("tiles",[]);self.project.setdefault("room_map",[-1]*(40*23));self.project.setdefault("variables",[]);ensure_stats(self.project);ensure_inventory(self.project);ensure_framework(self.project)
+  self.project.setdefault("tiles",[]);self.project.setdefault("room_map",[-1]*(40*23));self.project.setdefault("variables",[]);ensure_stats(self.project);ensure_inventory(self.project);ensure_controls(self.project);ensure_framework(self.project)
   if len(self.project["room_map"])<40*23:self.project["room_map"]=(self.project["room_map"]+[-1]*(40*23))[:40*23]
   for key in ANIMATION_STATES:self.project["directional_animations"].setdefault(key,"")
   self.photos.clear();self.refresh_animations();self.refresh_tiles();self.stats_panel.refresh();self.framework.refresh();self.blueprint.refresh();self.redraw()
