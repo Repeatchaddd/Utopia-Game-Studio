@@ -5,9 +5,10 @@ import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
 from rpg_stats import ensure_stats, stat_names
 from inventory_system import SLOTS, item_names, ensure_inventory
+from input_controls import action_names
 
 NODE_COLORS={
- "Start":"#6b4f8a","Update":"#8a4f6b","GamePad Input":"#315d83",
+ "Start":"#6b4f8a","Update":"#8a4f6b","GamePad Input":"#315d83","Input Action":"#315d83",
  "Move Character":"#3f7a55","Run Modifier":"#8a6335",
  "Set Variable":"#75558c","Change Variable":"#66519a","Compare Variable":"#8c5555",
  "Set Stat":"#7a5b3f","Change Stat":"#8b643c","Set Max Stat":"#9a713f","Compare Stat":"#9a4f4f",
@@ -140,15 +141,8 @@ class VariableActionDialog(simpledialog.Dialog):
  def apply(self):self.result=(self.name.get(),int(self.value.get()),self.op.get() if self.compare else None)
 
 def default_graph():
- nodes=[];links=[];ident=1
- nodes.append({"id":ident,"type":"Update","x":40,"y":40,"props":{}});ident+=1
- for row,(button,dx,dy) in enumerate((("LEFT",-1,0),("RIGHT",1,0),("UP",0,-1),("DOWN",0,1))):
-  source=ident;nodes.append({"id":source,"type":"GamePad Input","x":260,"y":30+row*115,"props":{"button":button}});ident+=1
-  target=ident;nodes.append({"id":target,"type":"Move Character","x":520,"y":30+row*115,"props":{"dx":dx,"dy":dy,"speed_percent":100,"speed_variable":""}});ident+=1
-  links.append({"from":source,"to":target})
- source=ident;nodes.append({"id":source,"type":"GamePad Input","x":260,"y":490,"props":{"button":"B"}});ident+=1
- target=ident;nodes.append({"id":target,"type":"Run Modifier","x":520,"y":490,"props":{"speed_percent":175,"speed_variable":""}});ident+=1;links.append({"from":source,"to":target})
- return {"next_id":ident,"nodes":nodes,"links":links}
+ return {"next_id":2,"nodes":[{"id":1,"type":"Update","x":40,"y":40,"props":{}}],"links":[]}
+
 
 class BlueprintPanel(ttk.Frame):
  def __init__(self,parent,project_getter,status):
@@ -186,7 +180,8 @@ class BlueprintPanel(ttk.Frame):
   self.canvas.create_rectangle(x,y,x+190,y+25,fill=NODE_COLORS.get(n["type"],"#555"),outline="",tags=(tag,"node"))
   self.canvas.create_text(x+8,y+13,text=n["type"],anchor="w",fill="white",font=("Segoe UI",10,"bold"),tags=(tag,"node"))
   p=n.get("props",{});detail=""
-  if n["type"]=="GamePad Input":detail="Button: "+p.get("button","A")
+  if n["type"]=="GamePad Input":detail="Legacy button: "+p.get("button","A")
+  elif n["type"]=="Input Action":detail="Action: "+(p.get("action","") or "(not assigned)")
   elif n["type"]=="Move Character":
    d=next((name for name,value in DIRECTIONS.items() if value==(p.get("dx",0),p.get("dy",0))),"?");src=p.get("speed_variable","") or f"{p.get('speed_percent',100)}%";detail=f"{d} • Speed: {src}"
   elif n["type"]=="Run Modifier":detail="Run speed: "+(p.get("speed_variable","") or f"{p.get('speed_percent',175)}%")
@@ -232,6 +227,7 @@ class BlueprintPanel(ttk.Frame):
  def add_node(self):
   g=self.graph();kind=self.kind.get();props={}
   if kind=="GamePad Input":props={"button":"A"}
+  elif kind=="Input Action":props={"action":""}
   elif kind=="Move Character":props={"dx":1,"dy":0,"speed_percent":100,"speed_variable":""}
   elif kind=="Run Modifier":props={"speed_percent":175,"speed_variable":""}
   elif kind in ("Set Variable","Change Variable"):props={"variable":"","value":0}
@@ -249,8 +245,14 @@ class BlueprintPanel(ttk.Frame):
   n=self.node(self.selected)
   if not n:return
   vars_=blueprint_variable_names(self.get_project())
-  if n["type"]=="GamePad Input":
-   value=simpledialog.askstring("GamePad Input","Button: LEFT, RIGHT, UP, DOWN, A, B, X, or Y",initialvalue=n["props"].get("button","A"))
+  if n["type"]=="Input Action":
+   names=action_names(self.get_project())
+   if not names:messagebox.showinfo("Utopia Game Studio","Create an Input Action on the Controls tab first.",parent=self);return
+   value=simpledialog.askstring("Input Action","Action name:\n"+", ".join(names),initialvalue=n["props"].get("action",names[0]),parent=self)
+   if value in names:n["props"]["action"]=value
+   elif value:messagebox.showerror("Utopia Game Studio","Choose an existing project Input Action.",parent=self)
+  elif n["type"]=="GamePad Input":
+   value=simpledialog.askstring("GamePad Input","Legacy button: LEFT, RIGHT, UP, DOWN, A, B, X, or Y",initialvalue=n["props"].get("button","A"))
    if value and value.upper() in BUTTONS:n["props"]["button"]=value.upper()
    elif value:messagebox.showerror("Utopia Game Studio","Unsupported GamePad button.")
   elif n["type"]=="Move Character":
