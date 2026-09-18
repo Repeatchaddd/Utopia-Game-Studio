@@ -1,7 +1,7 @@
-# Utopia Game Studio v1.95.005.000
+# Utopia Game Studio v1.95.006.000
 
 **Current development stage:** 1.95  
-**Build:** 1.95.005.000
+**Build:** 1.95.006.000
 
 ## v1.95.002.000 — RPG Stat System
 
@@ -287,3 +287,13 @@ Utopia Game Studio is not affiliated with or endorsed by Nintendo, Epic Games, o
 - Removed Test Run's built-in movement/button/inventory assumptions; Test Run reads the project's keyboard mappings.
 - New Blueprint graphs no longer create predefined movement/gamepad nodes. Existing legacy GamePad Input nodes remain readable for project compatibility.
 - Object Interact remains an engine event and is activated only when project logic routes a configured Input Action to Interact.
+
+
+### v1.95.006.000 — Dialogue System
+- Added a dedicated Dialogue tab and reusable project conversation database.
+- Conversations contain ordered pages with optional speaker names and multiline dialogue text.
+- Pages can be added, edited, deleted, and reordered.
+- Added Show Dialogue to Game Framework object actions, allowing Interact, Collision, Start, and other object events to launch conversations.
+- Test Run renders dialogue in a game-style dialogue box and pauses normal project input while a conversation is active.
+- Enter or Space advances dialogue pages in Test Run; these are editor test controls for the dialogue viewer rather than project gameplay bindings.
+- Dialogue definitions are project data and can be reused by multiple objects/events.
