@@ -9,6 +9,10 @@ def ensure_inventory(project):
  inv=project.setdefault("inventory",default_inventory())
  inv.setdefault("bag_capacity",24);inv.setdefault("items",[]);inv.setdefault("bag",[]);inv.setdefault("equipped",{})
  for s in SLOTS:inv["equipped"].setdefault(s,None)
+ # Migrate early inventory project files that stored allowed equipment slots as "slots".
+ for item in inv["items"]:
+  if "equip_slots" not in item:
+   item["equip_slots"]=list(item.get("slots",[]))
  return inv
 
 def find_item(project,name):return next((i for i in ensure_inventory(project)["items"] if i["name"]==name),None)
