@@ -7,6 +7,8 @@ from tkinter import colorchooser, filedialog, messagebox, simpledialog, ttk
 from blueprint_editor import BlueprintPanel, default_graph
 from game_framework import FrameworkPanel, GameRuntime, default_framework, ensure_framework
 from rpg_stats import RPGStatsPanel, default_stats, ensure_stats
+from inventory_system import default_inventory, ensure_inventory
+from inventory_editor import InventoryPanel
 
 APP_NAME, VERSION = "Utopia Game Studio", "1.95.002.000"
 ROOT = Path(__file__).resolve().parent
@@ -16,7 +18,7 @@ DEFAULT = {"format":"utopia-project-8","title":"My Utopia RPG","author":"Homebre
  "game_style":"2D / 2.5D RPG","background":"#18365c","player_color":"#f4d35e",
  "player_x":560,"player_y":320,"player_width":80,"player_height":80,"player_speed":6,
  "animations":{},"active_animation":"","directional_animations":{key:"" for key in ANIMATION_STATES},"blueprint":default_graph(),
- "tiles":[],"room_map":[-1]*(40*23),"variables":[],"rpg_stats":default_stats(),"framework":default_framework()}
+ "tiles":[],"room_map":[-1]*(40*23),"variables":[],"rpg_stats":default_stats(),"inventory":default_inventory(),"framework":default_framework()}
 
 def fresh(): return json.loads(json.dumps(DEFAULT))
 def rgba(value): return "0x" + value.lstrip("#").upper() + "FFu"
@@ -278,9 +280,9 @@ class Editor(tk.Tk):
   ttk.Label(bar,text="2D / 2.5D",foreground="#356fa6").pack(side="right",padx=8)
   tabs=ttk.Notebook(self); tabs.pack(fill="both",expand=True,padx=8,pady=(0,8))
   self.status=tk.StringVar(value="Ready"); ttk.Label(self,textvariable=self.status,relief="sunken",anchor="w",padding=4).pack(fill="x")
-  scene=ttk.Frame(tabs,padding=8); room=ttk.Frame(tabs,padding=8); anim=ttk.Frame(tabs,padding=8); stats=ttk.Frame(tabs); framework=ttk.Frame(tabs); logic=ttk.Frame(tabs)
-  tabs.add(scene,text="Scene");tabs.add(room,text="Room / Tiles");tabs.add(anim,text="Animated Character");tabs.add(stats,text="RPG Stats");tabs.add(framework,text="Game Framework");tabs.add(logic,text="Blueprint Logic")
-  self.build_scene(scene);self.build_room(room);self.build_anim(anim);self.stats_panel=RPGStatsPanel(stats,lambda:self.project,self.status,self.redraw);self.stats_panel.pack(fill="both",expand=True);self.framework=FrameworkPanel(framework,lambda:self.project,self.status,self.redraw);self.framework.pack(fill="both",expand=True);self.blueprint=BlueprintPanel(logic,lambda:self.project,self.status);self.blueprint.pack(fill="both",expand=True)
+  scene=ttk.Frame(tabs,padding=8); room=ttk.Frame(tabs,padding=8); anim=ttk.Frame(tabs,padding=8); stats=ttk.Frame(tabs); inventory=ttk.Frame(tabs); framework=ttk.Frame(tabs); logic=ttk.Frame(tabs)
+  tabs.add(scene,text="Scene");tabs.add(room,text="Room / Tiles");tabs.add(anim,text="Animated Character");tabs.add(stats,text="RPG Stats");tabs.add(inventory,text="Inventory");tabs.add(framework,text="Game Framework");tabs.add(logic,text="Blueprint Logic")
+  self.build_scene(scene);self.build_room(room);self.build_anim(anim);self.stats_panel=RPGStatsPanel(stats,lambda:self.project,self.status,self.redraw);self.stats_panel.pack(fill="both",expand=True);self.inventory_panel=InventoryPanel(inventory,lambda:self.project,self.status,self.redraw);self.inventory_panel.pack(fill="both",expand=True);self.framework=FrameworkPanel(framework,lambda:self.project,self.status,self.redraw);self.framework.pack(fill="both",expand=True);self.blueprint=BlueprintPanel(logic,lambda:self.project,self.status);self.blueprint.pack(fill="both",expand=True)
 
  def build_scene(self,parent):
   body=ttk.Panedwindow(parent,orient="horizontal"); body.pack(fill="both",expand=True)
@@ -425,7 +427,7 @@ class Editor(tk.Tk):
  def load_project(self):
   for k,v in self.vars.items():v.set(str(self.project[k]))
   self.project.setdefault("directional_animations",{})
-  self.project.setdefault("tiles",[]);self.project.setdefault("room_map",[-1]*(40*23));self.project.setdefault("variables",[]);ensure_stats(self.project);ensure_framework(self.project)
+  self.project.setdefault("tiles",[]);self.project.setdefault("room_map",[-1]*(40*23));self.project.setdefault("variables",[]);ensure_stats(self.project);ensure_inventory(self.project);ensure_framework(self.project)
   if len(self.project["room_map"])<40*23:self.project["room_map"]=(self.project["room_map"]+[-1]*(40*23))[:40*23]
   for key in ANIMATION_STATES:self.project["directional_animations"].setdefault(key,"")
   self.photos.clear();self.refresh_animations();self.refresh_tiles();self.stats_panel.refresh();self.framework.refresh();self.blueprint.refresh();self.redraw()
