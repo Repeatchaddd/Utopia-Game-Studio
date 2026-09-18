@@ -128,7 +128,7 @@ class TestRunner(tk.Toplevel):
  def __init__(self,parent,project,movement):
   super().__init__(parent);self.title(f"{APP_NAME} Test Run");self.geometry("960x600");self.minsize(640,400);self.project=json.loads(json.dumps(project));self.bp=movement
   self.bp_vars=dict(self.bp.get("variables",{}));self.rpg_stats={k:dict(v) for k,v in self.bp.get("stats",{}).items()};self.game=GameRuntime(self.project,self.bp_vars);self.first_tick=True
-  self.pressed=set();self.inventory_open=False;self.dialogue=None;self.dialogue_page=0;self.x=float(self.project["player_x"]);self.y=float(self.project["player_y"]);self.facing="down";self.frame=0;self.anim_tick=0;self.last_anim=None;self.photos={};self.closed=False
+  self.pressed=set();self.inventory_open=False;self.dialogue=None;self.dialogue_page=0;self.dialogue_choice=0;self.x=float(self.project["player_x"]);self.y=float(self.project["player_y"]);self.facing="down";self.frame=0;self.anim_tick=0;self.last_anim=None;self.photos={};self.closed=False
   info=ttk.Frame(self,padding=6);info.pack(fill="x");ttk.Label(info,text="Test Run uses this project’s Controls mappings. Esc closes Test Run.",anchor="center").pack(fill="x")
   self.canvas=tk.Canvas(self,background=self.project["background"],highlightthickness=0);self.canvas.pack(fill="both",expand=True)
   self.bind("<KeyPress>",self.key_down);self.bind("<KeyRelease>",self.key_up);self.bind("<Escape>",lambda _e:self.close());self.bind("<FocusOut>",lambda _e:self.pressed.clear());self.protocol("WM_DELETE_WINDOW",self.close);self.focus_force();self.after(16,self.tick)
@@ -136,9 +136,18 @@ class TestRunner(tk.Toplevel):
  def key_down(self,event):
   key=event.keysym.lower()
   if self.dialogue is not None:
+   pages=self.dialogue.get("pages",[]);page=pages[min(self.dialogue_page,len(pages)-1)] if pages else {};choices=page.get("choices",[])
+   if choices and key in ("up","w"):self.dialogue_choice=(self.dialogue_choice-1)%len(choices);return
+   if choices and key in ("down","s"):self.dialogue_choice=(self.dialogue_choice+1)%len(choices);return
    if key in ("return","space"):
-    self.dialogue_page+=1
-    if self.dialogue_page>=len(self.dialogue.get("pages",[])):self.dialogue=None;self.dialogue_page=0
+    if choices:
+     choice=choices[self.dialogue_choice%len(choices)];dest=choice.get("conversation","")
+     if dest:
+      conv=find_conversation(self.project,dest)
+      if conv and conv.get("pages"):self.dialogue=conv;self.dialogue_page=0;self.dialogue_choice=0;self.dialogue_choice=0;return
+     self.dialogue=None;self.dialogue_page=0;self.dialogue_choice=0;return
+    self.dialogue_page+=1;self.dialogue_choice=0
+    if self.dialogue_page>=len(pages):self.dialogue=None;self.dialogue_page=0
    return
   fresh=key not in self.pressed;self.pressed.add(key)
   if not fresh:return
@@ -300,12 +309,18 @@ class TestRunner(tk.Toplevel):
  def draw_dialogue(self,scale,ox,oy):
   pages=self.dialogue.get("pages",[]) if self.dialogue else []
   if not pages:return
-  p=pages[min(self.dialogue_page,len(pages)-1)];x=ox+120*scale;y=oy+500*scale;w=1040*scale;h=165*scale
+  p=pages[min(self.dialogue_page,len(pages)-1)];choices=p.get("choices",[]);x=ox+120*scale;y=oy+(430 if choices else 500)*scale;w=1040*scale;h=(235 if choices else 165)*scale
   self.canvas.create_rectangle(x,y,x+w,y+h,fill="#111111",outline="white",width=2)
   speaker=p.get("speaker","")
   if speaker:self.canvas.create_text(x+24*scale,y+18*scale,text=speaker,fill="white",anchor="nw",font=("Segoe UI",max(10,int(16*scale)),"bold"))
   self.canvas.create_text(x+24*scale,y+52*scale,text=p.get("text",""),fill="white",anchor="nw",width=990*scale,font=("Segoe UI",max(9,int(14*scale))))
-  self.canvas.create_text(x+w-20*scale,y+h-18*scale,text="Enter / Space",fill="#cccccc",anchor="se")
+  if choices:
+   cy=y+125*scale
+   for i,ch in enumerate(choices):
+    marker="> " if i==self.dialogue_choice%len(choices) else "  ";self.canvas.create_text(x+35*scale,cy,text=marker+ch.get("text",""),fill="white" if i==self.dialogue_choice%len(choices) else "#cccccc",anchor="nw");cy+=27*scale
+   hint="Up/Down + Enter"
+  else:hint="Enter / Space"
+  self.canvas.create_text(x+w-20*scale,y+h-18*scale,text=hint,fill="#cccccc",anchor="se")
 
  def draw_inventory(self,scale,ox,oy):
   inv=ensure_inventory(self.project);x=ox+210*scale;y=oy+90*scale;w=860*scale;h=540*scale
