@@ -12,7 +12,7 @@ NODE_COLORS={
  "Move Character":"#3f7a55","Run Modifier":"#8a6335",
  "Set Variable":"#75558c","Change Variable":"#66519a","Compare Variable":"#8c5555",
  "Set Stat":"#7a5b3f","Change Stat":"#8b643c","Set Max Stat":"#9a713f","Compare Stat":"#9a4f4f",
- "Add Item":"#527a68","Remove Item":"#7a5252","Has Item":"#6b6f8a","Equip Item":"#526f7a","Unequip Slot":"#7a6b52"
+ "Add Item":"#527a68","Remove Item":"#7a5252","Has Item":"#6b6f8a","Equip Item":"#526f7a","Unequip Slot":"#7a6b52","Interact":"#477a72","Toggle Inventory":"#6a5f82"
 }
 BUTTONS=("LEFT","RIGHT","UP","DOWN","A","B","X","Y")
 DIRECTIONS={"Left":(-1,0),"Right":(1,0),"Up":(0,-1),"Down":(0,1)}
@@ -195,6 +195,8 @@ class BlueprintPanel(ttk.Frame):
   elif n["type"] in ("Add Item","Remove Item","Has Item"):detail=f"{p.get('item','?')} x{p.get('quantity',1)}"
   elif n["type"]=="Equip Item":detail=f"{p.get('item','?')} -> {p.get('slot','?')}"
   elif n["type"]=="Unequip Slot":detail=f"Slot: {p.get('slot','?')}"
+  elif n["type"]=="Interact":detail="Interact with nearest object"
+  elif n["type"]=="Toggle Inventory":detail="Open / close inventory"
   else:detail="Execution event"
   self.canvas.create_text(x+10,y+51,text=detail,anchor="w",fill="#d7dce2",tags=(tag,"node"))
  def event_node(self,e):
@@ -341,7 +343,7 @@ class BlueprintPanel(ttk.Frame):
     name=pr.get("item","")
     if name not in item_names(p):return
     gates.append({"item":name,"quantity":max(1,int(pr.get("quantity",1)))})
-   elif t in ("Move Character","Run Modifier","Set Variable","Change Variable","Set Stat","Change Stat","Set Max Stat","Add Item","Remove Item","Equip Item","Unequip Slot"):
+   elif t in ("Move Character","Run Modifier","Set Variable","Change Variable","Set Stat","Change Stat","Set Max Stat","Add Item","Remove Item","Equip Item","Unequip Slot","Interact","Toggle Inventory"):
     action={"type":t,"source":source,"button":button,"gates":list(gates)}
     if t=="Move Character":
      action.update(dx=int(pr.get("dx",0)),dy=int(pr.get("dy",0)),speed=max(1,min(400,int(pr.get("speed_percent",100)))),speed_variable=pr.get("speed_variable","") if pr.get("speed_variable","") in cfg["variables"] else "")
