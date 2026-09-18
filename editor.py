@@ -12,7 +12,7 @@ from inventory_editor import InventoryPanel
 from input_controls import ControlsPanel, default_controls, ensure_controls
 from dialogue_system import DialoguePanel, default_dialogue, ensure_dialogue, find_conversation
 
-APP_NAME, VERSION = "Utopia Game Studio", "1.95.006.000"
+APP_NAME, VERSION = "Utopia Game Studio", "1.95.006.002"
 ROOT = Path(__file__).resolve().parent
 TEMPLATE = ROOT / "runtime_template"
 ANIMATION_STATES=("idle_down","idle_left","idle_right","idle_up","walk_down","walk_left","walk_right","walk_up")
@@ -123,8 +123,6 @@ class PixelFrameEditor(tk.Toplevel):
  def save(self):self.result=base64.b64encode(png_rgba(self.width,self.height,self.pixels)).decode("ascii");self.destroy()
 
 class TestRunner(tk.Toplevel):
- KEY_GROUPS={"LEFT":{"left","a"},"RIGHT":{"right","d"},"UP":{"up","w"},"DOWN":{"down","s"}}
- BUTTON_KEYS={"A":"z","B":"x","X":"c","Y":"v"}
  def __init__(self,parent,project,movement):
   super().__init__(parent);self.title(f"{APP_NAME} Test Run");self.geometry("960x600");self.minsize(640,400);self.project=json.loads(json.dumps(project));self.bp=movement
   self.bp_vars=dict(self.bp.get("variables",{}));self.rpg_stats={k:dict(v) for k,v in self.bp.get("stats",{}).items()};self.game=GameRuntime(self.project,self.bp_vars);self.first_tick=True
@@ -500,7 +498,7 @@ class Editor(tk.Tk):
   self.project.setdefault("tiles",[]);self.project.setdefault("room_map",[-1]*(40*23));self.project.setdefault("variables",[]);ensure_stats(self.project);ensure_inventory(self.project);ensure_controls(self.project);ensure_dialogue(self.project);ensure_framework(self.project)
   if len(self.project["room_map"])<40*23:self.project["room_map"]=(self.project["room_map"]+[-1]*(40*23))[:40*23]
   for key in ANIMATION_STATES:self.project["directional_animations"].setdefault(key,"")
-  self.photos.clear();self.refresh_animations();self.refresh_tiles();self.stats_panel.refresh();self.framework.refresh();self.blueprint.refresh();self.redraw()
+  self.photos.clear();self.refresh_animations();self.refresh_tiles();self.stats_panel.refresh();self.inventory_panel.refresh();self.controls_panel.refresh();self.dialogue_panel.refresh();self.framework.refresh();self.blueprint.refresh();self.redraw()
  def fields_changed(self):
   for k in ("title","author"):self.project[k]=self.vars[k].get()
   for k in ("player_x","player_y","player_width","player_height","player_speed"):
@@ -649,7 +647,7 @@ class Editor(tk.Tk):
   try:
    data=json.loads(Path(path).read_text(encoding="utf-8"))
    if data.get("format") not in ("utopia-project-8","utopia-project-7","utopia-project-6","utopia-project-5","utopia-project-4","utopia-project-3","utopia-project-2","wugc-project-1"):raise ValueError("Unsupported project format")
-   data["format"]="utopia-project-8";self.project={**fresh(),**data};self.project.setdefault("animations",{});self.project.setdefault("directional_animations",{});self.project.setdefault("blueprint",default_graph());self.project.setdefault("tiles",[]);self.project.setdefault("room_map",[-1]*(40*23));self.project.setdefault("variables",[]);ensure_stats(self.project);ensure_framework(self.project);self.project_path=Path(path);self.load_project();self.status.set(f"Opened {Path(path).name}")
+   data["format"]="utopia-project-8";self.project={**fresh(),**data};self.project.setdefault("animations",{});self.project.setdefault("directional_animations",{});self.project.setdefault("blueprint",default_graph());self.project.setdefault("tiles",[]);self.project.setdefault("room_map",[-1]*(40*23));self.project.setdefault("variables",[]);ensure_stats(self.project);ensure_inventory(self.project);ensure_controls(self.project);ensure_dialogue(self.project);ensure_framework(self.project);self.project_path=Path(path);self.load_project();self.status.set(f"Opened {Path(path).name}")
   except Exception as e:messagebox.showerror(APP_NAME,f"Open failed:\n{e}")
  def save(self):
   if self.project_path is None:return self.save_as()
