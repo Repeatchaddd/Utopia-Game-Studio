@@ -1,7 +1,7 @@
-# Utopia Game Studio v1.95.002.003
+# Utopia Game Studio v1.95.003.000
 
 **Current development stage:** 1.95  
-**Build:** 1.95.002.003
+**Build:** 1.95.003.000
 
 ## v1.95.002.000 — RPG Stat System
 
@@ -220,3 +220,15 @@ Utopia Game Studio is not affiliated with or endorsed by Nintendo, Epic Games, o
 - Copied/cut nodes retain their complete node type and properties.
 - Pasted nodes receive a new unique node ID and are offset from the source so duplicates are visible.
 - Connections are intentionally not copied or pasted; deleting/cutting a node safely removes its existing links.
+
+
+### v1.95.003.000 — RPG Inventory and Equipment
+- Added a dedicated Inventory editor tab.
+- Added reusable item definitions with item type, stack limit, description/stat metadata, and allowed equipment slots.
+- Added a separate bag inventory with configurable slot capacity and stack-aware quantities.
+- Added a differentiated equipped-item inventory with Head, Neck, Shoulders, Chest, Back, Hands, Waist, Legs, Feet, Main Hand, Off Hand, two Ring slots, and Accessory.
+- Equipping removes an item from the bag; replacing equipment returns the old item to the bag when space is available.
+- Unequipping returns equipment to the bag and respects bag capacity.
+- Item rename/delete operations propagate through bag and equipped data.
+- Added Blueprint node types for Add Item, Remove Item, Has Item, Equip Item, and Unequip Slot.
+- Inventory data is saved inside the .ugs project and older projects receive an empty inventory automatically.
