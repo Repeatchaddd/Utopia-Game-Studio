@@ -47,3 +47,20 @@ def unequip_item(project,slot):
  inv=ensure_inventory(project);name=inv["equipped"].get(slot)
  if not name or not add_to_bag(project,name,1):return False
  inv["equipped"][slot]=None;return True
+
+def equipment_modifiers(project):
+ """Return summed stat bonuses from all equipped item definitions."""
+ inv=ensure_inventory(project);totals={}
+ for name in inv["equipped"].values():
+  item=find_item(project,name) if name else None
+  if not item:continue
+  for stat,value in item.get("stats",{}).items():totals[stat]=totals.get(stat,0)+int(value)
+ return totals
+
+def effective_stat(base_stats,project,name):
+ s=base_stats.get(name,{})
+ return int(s.get("current",0))+equipment_modifiers(project).get(name,0)
+
+def effective_maximum(base_stats,project,name):
+ s=base_stats.get(name,{})
+ return int(s.get("maximum",0))+equipment_modifiers(project).get(name,0)
