@@ -4,7 +4,7 @@ import re
 import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
 from rpg_stats import ensure_stats, stat_names
-from inventory_system import SLOTS, item_names
+from inventory_system import SLOTS, item_names, ensure_inventory
 
 NODE_COLORS={
  "Start":"#6b4f8a","Update":"#8a4f6b","GamePad Input":"#315d83",
@@ -320,7 +320,7 @@ class BlueprintPanel(ttk.Frame):
   p=self.get_project();g=self.graph();lookup={n["id"]:n for n in g["nodes"]};outs={}
   for l in g["links"]:outs.setdefault(l["from"],[]).append(l["to"])
   preset={"Player.X":int(p.get("player_x",0)),"Player.Y":int(p.get("player_y",0)),"Player.Visible":1,"Player.Active":1,"Player.Width":int(p.get("player_width",48)),"Player.Height":int(p.get("player_height",48)),"Player.Solid":1}
-  cfg={"variables":{**preset,**{v["name"]:int(v.get("value",0)) for v in variables(p)}},"stats":{s["name"]:{"current":int(s["current"]),"minimum":int(s["minimum"]),"maximum":int(s["maximum"])} for s in ensure_stats(p)},"actions":[]}
+  cfg={"variables":{**preset,**{v["name"]:int(v.get("value",0)) for v in variables(p)}},"stats":{s["name"]:{"current":int(s["current"]),"minimum":int(s["minimum"]),"maximum":int(s["maximum"])} for s in ensure_stats(p)},"inventory":ensure_inventory(p),"actions":[]}
   def walk(node_id,source,button=None,gates=None,path=None):
    gates=list(gates or []);path=set(path or ())
    if node_id in path:return
@@ -335,7 +335,11 @@ class BlueprintPanel(ttk.Frame):
     name=pr.get("variable","")
     if name not in cfg["variables"]:return
     gates.append({"variable":name,"op":pr.get("op","=="),"value":int(pr.get("value",0))})
-   elif t in ("Move Character","Run Modifier","Set Variable","Change Variable","Set Stat","Change Stat","Set Max Stat"):
+   elif t=="Has Item":
+    name=pr.get("item","")
+    if name not in item_names(p):return
+    gates.append({"item":name,"quantity":max(1,int(pr.get("quantity",1)))})
+   elif t in ("Move Character","Run Modifier","Set Variable","Change Variable","Set Stat","Change Stat","Set Max Stat","Add Item","Remove Item","Equip Item","Unequip Slot"):
     action={"type":t,"source":source,"button":button,"gates":list(gates)}
     if t=="Move Character":
      action.update(dx=int(pr.get("dx",0)),dy=int(pr.get("dy",0)),speed=max(1,min(400,int(pr.get("speed_percent",100)))),speed_variable=pr.get("speed_variable","") if pr.get("speed_variable","") in cfg["variables"] else "")
@@ -344,6 +348,18 @@ class BlueprintPanel(ttk.Frame):
     elif t in ("Set Variable","Change Variable"):
      name=pr.get("variable","")
      if name in cfg["variables"]:action.update(variable=name,value=int(pr.get("value",0)));cfg["actions"].append(action)
+     action=None
+    elif t in ("Add Item","Remove Item"):
+     name=pr.get("item","")
+     if name in item_names(p):action.update(item=name,quantity=max(1,int(pr.get("quantity",1))));cfg["actions"].append(action)
+     action=None
+    elif t=="Equip Item":
+     name=pr.get("item","");slot=pr.get("slot","Main Hand")
+     if name in item_names(p) and slot in SLOTS:action.update(item=name,slot=slot);cfg["actions"].append(action)
+     action=None
+    elif t=="Unequip Slot":
+     slot=pr.get("slot","Main Hand")
+     if slot in SLOTS:action.update(slot=slot);cfg["actions"].append(action)
      action=None
     else:
      name=pr.get("stat","")
