@@ -7,7 +7,7 @@ from tkinter import colorchooser, filedialog, messagebox, simpledialog, ttk
 from blueprint_editor import BlueprintPanel, default_graph
 from game_framework import FrameworkPanel, GameRuntime, default_framework, ensure_framework
 from rpg_stats import RPGStatsPanel, default_stats, ensure_stats
-from inventory_system import default_inventory, ensure_inventory, bag_count, add_to_bag, remove_from_bag, equip_item, unequip_item
+from inventory_system import default_inventory, ensure_inventory, bag_count, add_to_bag, remove_from_bag, equip_item, unequip_item, equipment_modifiers
 from inventory_editor import InventoryPanel
 
 APP_NAME, VERSION = "Utopia Game Studio", "1.95.002.000"
@@ -277,7 +277,8 @@ class TestRunner(tk.Toplevel):
   else:self.canvas.create_rectangle(x,y,x+pw,y+ph,fill=self.project["player_color"],outline="white")
   self.canvas.create_text(ox+8,oy+8,text=self.project["title"] or "Untitled",fill="white",anchor="nw")
   if self.rpg_stats:
-   stat_text="   ".join(f"{name}: {s['current']}/{s['maximum']}" for name,s in self.rpg_stats.items() if name in ("Life","Mana","Stamina"))
+   mods=equipment_modifiers(self.project)
+   stat_text="   ".join(f"{name}: {s['current']+mods.get(name,0)}/{s['maximum']+mods.get(name,0)}" for name,s in self.rpg_stats.items() if name in ("Life","Mana","Stamina"))
    if stat_text:self.canvas.create_text(ox+8,oy+28,text=stat_text,fill="white",anchor="nw")
 
 class Editor(tk.Tk):
