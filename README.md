@@ -1,7 +1,7 @@
-# Utopia Game Studio v1.95.003.000
+# Utopia Game Studio v1.95.003.001
 
 **Current development stage:** 1.95  
-**Build:** 1.95.003.000
+**Build:** 1.95.003.001
 
 ## v1.95.002.000 — RPG Stat System
 
@@ -232,3 +232,12 @@ Utopia Game Studio is not affiliated with or endorsed by Nintendo, Epic Games, o
 - Item rename/delete operations propagate through bag and equipped data.
 - Added Blueprint node types for Add Item, Remove Item, Has Item, Equip Item, and Unequip Slot.
 - Inventory data is saved inside the .ugs project and older projects receive an empty inventory automatically.
+
+
+### v1.95.003.001 — Inventory Blueprint Runtime
+- Inventory Blueprint nodes are now compiled into Blueprint actions instead of editor-only nodes.
+- Test Run executes Add Item, Remove Item, Equip Item, and Unequip Slot from Start, Update, and GamePad Input execution paths.
+- Has Item is now a conditional Blueprint gate and checks bag quantity before allowing downstream nodes to execute.
+- Inventory actions honor existing variable/stat gates on the same execution path.
+- Test Run uses the same bag capacity, stacking, equipment-slot compatibility, equip replacement, and unequip rules as the Inventory editor.
+- Blueprint compiled configuration now carries the project's inventory definition/state, preparing inventory data for native Wii U export.
