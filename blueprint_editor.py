@@ -378,6 +378,10 @@ class BlueprintPanel(ttk.Frame):
     button=n.get("props",{}).get("button","")
     if button in BUTTONS:
      for child in outs.get(n["id"],[]):walk(child,"input",button,[],{n["id"]})
+   elif n["type"]=="Input Action":
+    action_name=n.get("props",{}).get("action","")
+    if action_name in action_names(p):
+     for child in outs.get(n["id"],[]):walk(child,"action",action_name,[],{n["id"]})
   return cfg
  def movement_config(self):return self.compiled_config()
  def write_header(self,path):
