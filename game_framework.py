@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Utopia Game Studio v1.95.001.000 generic game-framework skeleton."""
+"""Utopia Game Studio v1.95.002.001 generic game-framework skeleton."""
 import json
 import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
@@ -8,6 +8,11 @@ OBJECT_KINDS=("Player","NPC","Enemy","Item","Generic")
 EVENT_TYPES=("Game Start","Room Start","Update","Collision")
 ACTION_TYPES=("Set Variable","Change Variable","Destroy Self","Hide Self","Show Self","Change Room","Move Self")
 COMPARE_OPS=("==","!=", "<","<=",">",">=")
+PRESET_OBJECT_VARIABLES=("X","Y","Visible","Active","Width","Height","Solid")
+def object_variable_names(obj):
+ names=[f"Self.{n}" for n in PRESET_OBJECT_VARIABLES]
+ names += [f"Self.{n}" for n in obj.get("variables",{}) if n not in PRESET_OBJECT_VARIABLES]
+ return names
 
 def default_framework():
  return {
@@ -50,7 +55,7 @@ class FrameworkPanel(ttk.Frame):
   mid=ttk.LabelFrame(self,text="Rooms / Instances",padding=8);mid.grid(row=0,column=1,sticky="nsew",padx=(0,8));mid.columnconfigure(0,weight=1);mid.rowconfigure(1,weight=1)
   right=ttk.LabelFrame(self,text="Object Events / Actions",padding=8);right.grid(row=0,column=2,sticky="ns")
   self.object_list=tk.Listbox(left,width=25,height=18,exportselection=False);self.object_list.pack(fill="both",expand=True);self.object_list.bind("<<ListboxSelect>>",lambda e:self.refresh_events())
-  ttk.Button(left,text="Add Object",command=self.add_object).pack(fill="x",pady=(8,2));ttk.Button(left,text="Edit Object",command=self.edit_object).pack(fill="x");ttk.Button(left,text="Delete Object",command=self.delete_object).pack(fill="x",pady=(2,0))
+  ttk.Button(left,text="Add Object",command=self.add_object).pack(fill="x",pady=(8,2));ttk.Button(left,text="Edit Object",command=self.edit_object).pack(fill="x");ttk.Button(left,text="Object Variables",command=self.manage_object_variables).pack(fill="x",pady=(2,0));ttk.Button(left,text="Delete Object",command=self.delete_object).pack(fill="x",pady=(2,0))
   top=ttk.Frame(mid);top.grid(row=0,column=0,sticky="ew");self.room=tk.StringVar();self.room_box=ttk.Combobox(top,textvariable=self.room,state="readonly",width=25);self.room_box.pack(side="left",fill="x",expand=True);self.room_box.bind("<<ComboboxSelected>>",lambda e:self.refresh_instances())
   ttk.Button(top,text="+ Room",command=self.add_room).pack(side="left",padx=3);ttk.Button(top,text="Start",command=self.set_start_room).pack(side="left")
   self.instance_list=tk.Listbox(mid,height=18,exportselection=False);self.instance_list.grid(row=1,column=0,sticky="nsew",pady=(8,6))
@@ -93,6 +98,18 @@ class FrameworkPanel(ttk.Frame):
   if h is not None:o["height"]=h
   solid=messagebox.askyesno("Object Properties","Should this object block/collide as solid?",parent=self);o["solid"]=solid
   self.refresh();self.changed()
+ def manage_object_variables(self):
+  o=self.selected_object()
+  if not o:return
+  while True:
+   custom=[n for n in o.get("variables",{}) if n not in PRESET_OBJECT_VARIABLES]
+   choice=simpledialog.askstring("Object Variables","Preset variables are always available:\nX, Y, Visible, Active, Width, Height, Solid\n\nCustom variables: "+(", ".join(custom) if custom else "(none)")+"\n\nEnter a custom variable name to add/edit, or leave blank to close:",parent=self)
+   if not choice:break
+   name="".join(ch if ch.isalnum() or ch=="_" else "_" for ch in choice.strip())[:32]
+   if not name or name in PRESET_OBJECT_VARIABLES:
+    messagebox.showinfo("Object Variables","That name is reserved for a preset object variable.",parent=self);continue
+   value=simpledialog.askinteger("Object Variables",f"Starting value for {name}:",initialvalue=int(o.get("variables",{}).get(name,0)),parent=self)
+   if value is not None:o.setdefault("variables",{})[name]=value;self.changed();self.status.set("Object variable updated")
  def delete_object(self):
   o=self.selected_object()
   if not o:return
@@ -149,7 +166,16 @@ class FrameworkPanel(ttk.Frame):
   if kind not in ACTION_TYPES:return
   a={"type":kind}
   if kind in ("Set Variable","Change Variable"):
-   a["variable"]=simpledialog.askstring("Action","Global variable name:",initialvalue="Score",parent=self) or "Score"
+   o=self.selected_object();globals_=[v.get("name","") for v in self.get_project().get("variables",[]) if v.get("name")]
+   choices=object_variable_names(o)+globals_
+   d=tk.Toplevel(self);d.title("Choose Variable");d.transient(self.winfo_toplevel());d.grab_set()
+   ttk.Label(d,text="Variable").grid(row=0,column=0,padx=8,pady=8,sticky="w")
+   vv=tk.StringVar(value=choices[0] if choices else "Self.X");box=ttk.Combobox(d,textvariable=vv,values=choices,state="readonly",width=28);box.grid(row=0,column=1,padx=8,pady=8)
+   result={"ok":False}
+   def accept():result["ok"]=True;d.destroy()
+   ttk.Button(d,text="OK",command=accept).grid(row=1,column=1,padx=8,pady=(0,8),sticky="e");d.wait_window()
+   if not result["ok"]:return
+   a["variable"]=vv.get()
    a["value"]=simpledialog.askinteger("Action","Value:",initialvalue=1,parent=self) or 0
   elif kind=="Change Room":
    a["room"]=simpledialog.askstring("Action","Destination room:",initialvalue=self.fw()["start_room"],parent=self) or self.fw()["start_room"]
@@ -171,11 +197,36 @@ class GameRuntime:
  def rect(self,inst):
   o=self.obj(inst) or {"width":32,"height":32};return (inst["x"],inst["y"],inst["x"]+o.get("width",32),inst["y"]+o.get("height",32))
  def hit(self,a,b):return a[0]<b[2] and a[2]>b[0] and a[1]<b[3] and a[3]>b[1]
+ def _object_value(self,inst,name):
+  o=self.obj(inst) or {}
+  if name=="X":return int(inst.get("x",0))
+  if name=="Y":return int(inst.get("y",0))
+  if name=="Visible":return 0 if inst["id"] in self.hidden else int(inst.get("visible",True))
+  if name=="Active":return int(inst.get("active",True))
+  if name=="Width":return int(o.get("width",48))
+  if name=="Height":return int(o.get("height",48))
+  if name=="Solid":return int(o.get("solid",False))
+  return int(inst.setdefault("variables",{}).get(name,o.get("variables",{}).get(name,0)))
+ def _set_object_value(self,inst,name,value):
+  value=int(value);o=self.obj(inst) or {}
+  if name=="X":inst["x"]=value
+  elif name=="Y":inst["y"]=value
+  elif name=="Visible":
+   inst["visible"]=bool(value);self.hidden.discard(inst["id"]) if value else self.hidden.add(inst["id"])
+  elif name=="Active":inst["active"]=bool(value)
+  elif name=="Width":o["width"]=max(1,value)
+  elif name=="Height":o["height"]=max(1,value)
+  elif name=="Solid":o["solid"]=bool(value)
+  else:inst.setdefault("variables",{})[name]=value
  def actions(self,runner,inst,actions):
   for a in actions:
    t=a["type"]
-   if t=="Set Variable":self.vars[a["variable"]]=int(a.get("value",0))
-   elif t=="Change Variable":self.vars[a["variable"]]=self.vars.get(a["variable"],0)+int(a.get("value",0))
+   if t in ("Set Variable","Change Variable"):
+    name=a.get("variable","");value=int(a.get("value",0))
+    if name.startswith("Self."):
+     key=name[5:];self._set_object_value(inst,key,value if t=="Set Variable" else self._object_value(inst,key)+value)
+    elif t=="Set Variable":self.vars[name]=value
+    else:self.vars[name]=self.vars.get(name,0)+value
    elif t=="Destroy Self":self.destroyed.add(inst["id"])
    elif t=="Hide Self":self.hidden.add(inst["id"])
    elif t=="Show Self":self.hidden.discard(inst["id"])
