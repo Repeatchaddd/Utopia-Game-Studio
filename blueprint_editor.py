@@ -343,6 +343,8 @@ class BlueprintPanel(ttk.Frame):
     name=pr.get("item","")
     if name not in item_names(p):return
     gates.append({"item":name,"quantity":max(1,int(pr.get("quantity",1)))})
+    for child in outs.get(node_id,[]):walk(child,source,button,gates,path)
+    return
    elif t in ("Move Character","Run Modifier","Set Variable","Change Variable","Set Stat","Change Stat","Set Max Stat","Add Item","Remove Item","Equip Item","Unequip Slot","Interact","Toggle Inventory"):
     action={"type":t,"source":source,"button":button,"gates":list(gates)}
     if t=="Move Character":
