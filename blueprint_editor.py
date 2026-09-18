@@ -24,7 +24,9 @@ def variables(project):
  project.setdefault("variables",[])
  return project["variables"]
 
+PRESET_PLAYER_VARIABLES=("Player.X","Player.Y","Player.Visible","Player.Active","Player.Width","Player.Height","Player.Solid")
 def variable_names(project):return [v["name"] for v in variables(project)]
+def blueprint_variable_names(project):return list(PRESET_PLAYER_VARIABLES)+variable_names(project)
 
 class VariableManager(simpledialog.Dialog):
  def __init__(self,parent,project):self.project=project;super().__init__(parent,"Blueprint Variables")
@@ -233,7 +235,7 @@ class BlueprintPanel(ttk.Frame):
  def edit_node(self):
   n=self.node(self.selected)
   if not n:return
-  vars_=variable_names(self.get_project())
+  vars_=blueprint_variable_names(self.get_project())
   if n["type"]=="GamePad Input":
    value=simpledialog.askstring("GamePad Input","Button: LEFT, RIGHT, UP, DOWN, A, B, X, or Y",initialvalue=n["props"].get("button","A"))
    if value and value.upper() in BUTTONS:n["props"]["button"]=value.upper()
@@ -270,7 +272,8 @@ class BlueprintPanel(ttk.Frame):
  def compiled_config(self):
   p=self.get_project();g=self.graph();lookup={n["id"]:n for n in g["nodes"]};outs={}
   for l in g["links"]:outs.setdefault(l["from"],[]).append(l["to"])
-  cfg={"variables":{v["name"]:int(v.get("value",0)) for v in variables(p)},"stats":{s["name"]:{"current":int(s["current"]),"minimum":int(s["minimum"]),"maximum":int(s["maximum"])} for s in ensure_stats(p)},"actions":[]}
+  preset={"Player.X":int(p.get("player_x",0)),"Player.Y":int(p.get("player_y",0)),"Player.Visible":1,"Player.Active":1,"Player.Width":int(p.get("player_width",48)),"Player.Height":int(p.get("player_height",48)),"Player.Solid":1}
+  cfg={"variables":{**preset,**{v["name"]:int(v.get("value",0)) for v in variables(p)}},"stats":{s["name"]:{"current":int(s["current"]),"minimum":int(s["minimum"]),"maximum":int(s["maximum"])} for s in ensure_stats(p)},"actions":[]}
   def walk(node_id,source,button=None,gates=None,path=None):
    gates=list(gates or []);path=set(path or ())
    if node_id in path:return
