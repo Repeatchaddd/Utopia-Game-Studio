@@ -12,7 +12,7 @@ from inventory_editor import InventoryPanel
 from input_controls import ControlsPanel, default_controls, ensure_controls
 from dialogue_system import DialoguePanel, default_dialogue, ensure_dialogue, find_conversation
 
-APP_NAME, VERSION = "Utopia Game Studio", "1.95.006.002"
+APP_NAME, VERSION = "Utopia Game Studio", "1.95.006.003"
 ROOT = Path(__file__).resolve().parent
 TEMPLATE = ROOT / "runtime_template"
 ANIMATION_STATES=("idle_down","idle_left","idle_right","idle_up","walk_down","walk_left","walk_right","walk_up")
@@ -154,7 +154,7 @@ class TestRunner(tk.Toplevel):
  def key_up(self,event):self.pressed.discard(event.keysym.lower())
  def show_dialogue(self,name):
   conv=find_conversation(self.project,name)
-  if conv and conv.get("pages"):self.dialogue=conv;self.dialogue_page=0
+  if conv and conv.get("pages"):self.dialogue=conv;self.dialogue_page=0;self.dialogue_choice=0
  def action_held(self,name):
   action=next((a for a in ensure_controls(self.project)["actions"] if a["name"]==name),None)
   return bool(action and set(action.get("keyboard",[]))&self.pressed)
